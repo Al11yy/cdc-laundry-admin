@@ -1,11 +1,10 @@
+/* PONDASI UTAMA TAILWIND V4 - Wajib di paling atas */
+@import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
 
-@tailwind base;
 @custom-variant dark (&:is(.dark *));
-@tailwind components;
-@tailwind utilities;
 
 @theme inline {
   --font-heading: var(--font-sans);
