@@ -26,8 +26,12 @@ export default function Login() {
       const response = await apiClient.post('/login', { email, password });
       
       if (response.data.success) {
-        localStorage.setItem('token', response.data.token);
+        // PERBAIKAN: Ambil dari .token atau .access_token (tergantung bawaan Laravel lo)
+        const validToken = response.data.token || response.data.access_token;
+        
+        localStorage.setItem('token', validToken);
         localStorage.setItem('user', JSON.stringify(response.data.user));
+        
         navigate('/dashboard');
       }
     } catch (err: any) {

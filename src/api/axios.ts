@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  // Sesuaikan port-nya dengan port Laravel Laragon/XAMPP lo (misal: 8000 atau cdc-laundry-api.test)
   baseURL: 'http://127.0.0.1:8000/api', 
   headers: {
     'Accept': 'application/json',
@@ -12,9 +11,12 @@ const apiClient = axios.create({
 // Otomatis suntik token Sanctum jika admin sudah login
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  if (token) {
+  
+  // PERBAIKAN: Pastikan tokennya beneran ada, bukan teks 'undefined' atau 'null'
+  if (token && token !== 'undefined' && token !== 'null') {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
   return config;
 });
 
