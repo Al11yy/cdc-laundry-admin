@@ -8,9 +8,24 @@ import Services from '@/pages/Services';
 import Customers from './pages/Customers';
 import Transactions from './pages/Transactions';
 
+import { ThemeProvider } from '@/context/ThemeContext';
+import { Toaster } from 'sonner';
+
 function App() {
   return (
-    <Router>
+    <ThemeProvider defaultTheme="system">
+      <Toaster 
+        position="bottom-right" 
+        closeButton 
+        theme="system" 
+        toastOptions={{
+          className: 'font-sans text-xs bg-card border border-border text-foreground shadow-xl rounded-xl',
+          style: {
+            fontFamily: 'Poppins, sans-serif',
+          }
+        }}
+      />
+      <Router>
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
@@ -29,6 +44,7 @@ function App() {
         </Route>
       </Routes>
     </Router>
+  </ThemeProvider>
   );
 }
 
