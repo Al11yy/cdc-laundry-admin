@@ -7,6 +7,10 @@ import Dashboard from '@/pages/Dashboard';
 import Services from '@/pages/Services';
 import Customers from './pages/Customers';
 import Transactions from './pages/Transactions';
+import Reports from '@/pages/Reports';
+import Queue from '@/pages/Queue';
+import Staff from '@/pages/Staff';
+import Settings from '@/pages/Settings';
 
 import { ThemeProvider } from '@/context/ThemeContext';
 import { Toaster } from 'sonner';
@@ -41,6 +45,10 @@ function App() {
           {/* Sisa halaman yang nanti bakal kita bikin */}
           <Route path="customers" element={<Customers />} />
           <Route path="transactions" element={<Transactions />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="queue" element={<Queue />} />
+          <Route path="staff" element={<Staff />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </Router>

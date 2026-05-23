@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { 
   Plus, Trash2, Loader2, Camera, Eye, Edit, Receipt, 
-  WashingMachine, Search 
+  Search, X, LayoutGrid, List, MessageSquare, MapPin 
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -18,6 +18,8 @@ export default function Transactions() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [activePopoverId, setActivePopoverId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -225,7 +227,7 @@ export default function Transactions() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Data Transaksi</h1>
           <p className="text-xs text-muted-foreground mt-1 font-mono">
-            Monitor sirkulasi pakaian masuk, status pencucian, dan riwayat nota pembayaran pelanggan.
+            Monitor sirkulasi pakaian masuk, status pencucian, dan riwayat progress laundry pelanggan secara real-time.
           </p>
         </div>
         <Button onClick={handleAddOpen} className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 rounded-xl px-4 py-2 font-medium">
@@ -233,35 +235,65 @@ export default function Transactions() {
         </Button>
       </div>
 
-      {/* FILTER & SEARCH */}
-      <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between bg-card border border-border rounded-2xl p-4 shadow-sm">
-        <div className="relative w-full md:max-w-xs">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Cari nota, pelanggan, layanan..." 
-            className="pl-9 bg-background border-border text-foreground focus-visible:ring-primary rounded-xl"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      {/* FILTER, SEARCH & VIEW SWITCHER */}
+      <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between bg-card border border-border rounded-2xl p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Cari nota, pelanggan, layanan..." 
+              className="pl-9 bg-background border-border text-foreground focus-visible:ring-primary rounded-xl"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          
+          {/* View Toggle Switcher */}
+          <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-xl border border-border/60 shrink-0 w-fit">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                viewMode === 'table' 
+                  ? 'bg-card text-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Tampilan Tabel"
+            >
+              <List size={14} />
+              <span>Tabel</span>
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                viewMode === 'grid' 
+                  ? 'bg-card text-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Card Grid"
+            >
+              <LayoutGrid size={14} />
+              <span>Grid</span>
+            </button>
+          </div>
         </div>
         
         {/* Status Filters Chips */}
         <div className="flex flex-wrap gap-1.5">
           {[
             { value: 'all', label: 'Semua' },
-            { value: 'antrian', label: '🕒 Antrian' },
-            { value: 'dicuci', label: '🧼 Dicuci' },
-            { value: 'disetrika', label: '💨 Disetrika' },
-            { value: 'siap diambil', label: '✅ Siap Diambil' },
-            { value: 'diambil', label: '📦 Diambil' }
+            { value: 'antrian', label: 'Antrian' },
+            { value: 'dicuci', label: 'Dicuci' },
+            { value: 'disetrika', label: 'Disetrika' },
+            { value: 'siap diambil', label: 'Siap Diambil' },
+            { value: 'diambil', label: 'Diambil' }
           ].map((chip) => (
             <button
               key={chip.value}
               onClick={() => setStatusFilter(chip.value)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all duration-200 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all duration-300 transform hover:scale-[1.02] active:scale-95 cursor-pointer ${
                 statusFilter === chip.value
-                  ? 'bg-primary border-primary text-primary-foreground font-semibold shadow-sm'
-                  : 'bg-muted border-border text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                  ? 'bg-primary border-primary text-primary-foreground font-semibold shadow-md shadow-primary/20'
+                  : 'bg-muted/50 border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
               {chip.label}
@@ -270,49 +302,46 @@ export default function Transactions() {
         </div>
       </div>
 
-      {/* TRANSACTION LIST TABLE */}
-      <div className="border border-border rounded-2xl bg-card overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/40 border-b border-border">
-              <TableRow className="border-none hover:bg-transparent">
-                <TableHead className="w-28 text-muted-foreground font-mono text-xs pl-6">Nota ID</TableHead>
-                <TableHead className="w-24 text-muted-foreground font-mono text-xs">Foto Pakaian</TableHead>
-                <TableHead className="text-muted-foreground font-mono text-xs">Pelanggan</TableHead>
-                <TableHead className="text-muted-foreground font-mono text-xs">Total Harga</TableHead>
-                <TableHead className="text-muted-foreground font-mono text-xs">Update Status</TableHead>
-                <TableHead className="text-right text-muted-foreground font-mono text-xs pr-6">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={6} className="text-center h-32">
-                    <Loader2 className="animate-spin text-primary mx-auto h-8 w-8" />
-                    <p className="text-xs text-muted-foreground font-mono mt-2">MENGAMBIL TRANSAKSI...</p>
-                  </TableCell>
+      {/* RENDER LIST (TABLE VS GRID) */}
+      {loading ? (
+        <div className="border border-border rounded-2xl bg-card p-12 text-center shadow-sm">
+          <Loader2 className="animate-spin text-primary mx-auto h-8 w-8" />
+          <p className="text-xs text-muted-foreground font-mono mt-2">MENGAMBIL TRANSAKSI...</p>
+        </div>
+      ) : filteredTransactions.length === 0 ? (
+        <div className="border border-border rounded-2xl bg-card p-12 shadow-sm">
+          <div className="flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-muted/65 flex items-center justify-center text-muted-foreground mb-4 border border-border/60 shadow-sm">
+              <Receipt className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-sm font-semibold text-foreground">Tidak Ada Transaksi</h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">
+              {searchQuery || statusFilter !== 'all' ? 'Tidak ada transaksi yang cocok dengan filter pencarian.' : 'Belum ada transaksi tercatat di sistem laundry.'}
+            </p>
+            {statusFilter === 'all' && !searchQuery && (
+              <Button onClick={handleAddOpen} variant="outline" className="mt-4 border-border text-xs rounded-xl gap-2 hover:bg-muted text-foreground">
+                <Plus size={14} /> Catat Transaksi
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : viewMode === 'table' ? (
+        /* TABLE VIEW MODE */
+        <div className="border border-border rounded-2xl bg-card overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/40 border-b border-border">
+                <TableRow className="border-none hover:bg-transparent">
+                  <TableHead className="w-28 text-muted-foreground font-mono text-xs pl-6">Nota ID</TableHead>
+                  <TableHead className="w-24 text-muted-foreground font-mono text-xs">Foto Pakaian</TableHead>
+                  <TableHead className="text-muted-foreground font-mono text-xs">Pelanggan</TableHead>
+                  <TableHead className="text-muted-foreground font-mono text-xs">Berat / Kuantitas</TableHead>
+                  <TableHead className="text-muted-foreground font-mono text-xs">Update Status</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-mono text-xs pr-6">Aksi</TableHead>
                 </TableRow>
-              ) : filteredTransactions.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={6} className="py-12">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <div className="w-16 h-16 rounded-2xl bg-muted/65 flex items-center justify-center text-muted-foreground mb-4 border border-border/60 shadow-sm">
-                        <Receipt className="w-8 h-8 text-muted-foreground" />
-                      </div>
-                      <h3 className="text-sm font-semibold text-foreground">Tidak Ada Transaksi</h3>
-                      <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">
-                        {searchQuery || statusFilter !== 'all' ? 'Tidak ada transaksi yang cocok dengan filter pencarian.' : 'Belum ada transaksi tercatat di sistem laundry.'}
-                      </p>
-                      {statusFilter === 'all' && !searchQuery && (
-                        <Button onClick={handleAddOpen} variant="outline" className="mt-4 border-border text-xs rounded-xl gap-2 hover:bg-muted text-foreground">
-                          <Plus size={14} /> Catat Transaksi
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredTransactions.map((trx, i) => {
+              </TableHeader>
+              <TableBody>
+                {filteredTransactions.map((trx, i) => {
                   const name = trx.customer?.user?.name || 'Pelanggan';
                   const avatarColor = avatarColors[i % avatarColors.length];
 
@@ -334,26 +363,62 @@ export default function Transactions() {
                           <span className="text-[10px] text-muted-foreground italic font-mono">Tidak ada</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="relative">
                         <div className="flex items-center gap-3">
                           <div className={`w-7 h-7 rounded-full border flex items-center justify-center text-[10px] font-bold font-mono ${avatarColor}`}>
                             {getInitials(name)}
                           </div>
-                          <div>
-                            <span className="font-semibold text-foreground text-sm block">{name}</span>
-                            <span className="text-[10px] text-muted-foreground font-mono">{trx.service?.service_name || 'Layanan'}</span>
+                          <div 
+                            className="relative"
+                            onMouseEnter={() => setActivePopoverId(trx.id)}
+                            onMouseLeave={() => setActivePopoverId(null)}
+                          >
+                            <button 
+                              type="button"
+                              className="font-semibold text-foreground text-sm hover:text-primary transition-colors cursor-pointer text-left block focus:outline-none"
+                              onClick={() => setActivePopoverId(activePopoverId === trx.id ? null : trx.id)}
+                            >
+                              {name}
+                            </button>
+                            <span className="text-[10px] text-muted-foreground font-mono block mt-0.5">{trx.service?.service_name || 'Layanan'}</span>
+
+                            {activePopoverId === trx.id && (
+                              <div className="absolute left-0 bottom-full mb-2.5 z-50 w-64 bg-card border border-border p-4 rounded-xl shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 text-left">
+                                <div className="space-y-2.5">
+                                  <div className="flex items-center gap-2 text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    <span>Detail Kontak Pelanggan</span>
+                                  </div>
+                                  <div className="space-y-1.5 text-xs">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                      <MessageSquare size={13} className="shrink-0" />
+                                      <a 
+                                        href={formatWhatsAppLink(trx.customer?.phone)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline font-mono font-semibold"
+                                      >
+                                        {trx.customer?.phone || '-'} ↗
+                                      </a>
+                                    </div>
+                                    <div className="flex items-start gap-2 text-muted-foreground">
+                                      <MapPin size={13} className="shrink-0 mt-0.5" />
+                                      <span className="leading-relaxed">
+                                        {trx.customer?.address || 'Tidak ada alamat'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="absolute top-full left-4 -translate-y-px border-8 border-transparent border-t-card" />
+                              </div>
+                            )}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <span className="font-semibold text-foreground text-sm block font-mono">
-                            Rp {Number(trx.total_price).toLocaleString('id-ID')}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            {trx.weight} {trx.service?.unit || 'Kg'}
-                          </span>
-                        </div>
+                        <span className="font-semibold text-foreground text-sm font-mono block">
+                          {trx.weight} {trx.service?.unit || 'Kg'}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <select 
@@ -361,11 +426,11 @@ export default function Transactions() {
                           value={trx.status} 
                           onChange={(e) => handleStatusChange(trx.id, e.target.value)}
                         >
-                          <option value="antrian" className="bg-card text-amber-500">🕒 Antrian</option>
-                          <option value="dicuci" className="bg-card text-blue-500">🧼 Dicuci</option>
-                          <option value="disetrika" className="bg-card text-purple-500">💨 Disetrika</option>
-                          <option value="siap diambil" className="bg-card text-emerald-500">✅ Siap Diambil</option>
-                          <option value="diambil" className="bg-card text-muted-foreground">📦 Sudah Diambil</option>
+                          <option value="antrian" className="bg-card text-amber-500">Antrian</option>
+                          <option value="dicuci" className="bg-card text-blue-500">Dicuci</option>
+                          <option value="disetrika" className="bg-card text-purple-500">Disetrika</option>
+                          <option value="siap diambil" className="bg-card text-emerald-500">Siap Diambil</option>
+                          <option value="diambil" className="bg-card text-muted-foreground">Sudah Diambil</option>
                         </select>
                       </TableCell>
                       <TableCell className="text-right pr-6">
@@ -398,275 +463,535 @@ export default function Transactions() {
                       </TableCell>
                     </TableRow>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </div>
-      </div>
-
-      {/* FORM INPUT/EDIT MODAL */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[450px] bg-card border-border text-foreground rounded-2xl p-6">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold text-foreground border-b border-border/60 pb-3">
-              {editId ? 'Ubah Nota Transaksi' : 'Buat Nota Transaksi Baru'}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 py-3">
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold">Pelanggan</Label>
-              <select 
-                className="flex h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all" 
-                value={formData.customer_id} 
-                onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })} 
-                required
-              >
-                <option value="" className="bg-card text-muted-foreground">-- Pilih Pelanggan --</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id} className="bg-card text-foreground">
-                    {c.user?.name} ({c.phone})
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold">Layanan</Label>
-              <select 
-                className="flex h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all" 
-                value={formData.service_id} 
-                onChange={(e) => setFormData({ ...formData, service_id: e.target.value })} 
-                required
-              >
-                <option value="" className="bg-card text-muted-foreground">-- Pilih Layanan --</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id} className="bg-card text-foreground">
-                    {s.service_name} (Rp {Number(s.price).toLocaleString('id-ID')} / {s.unit})
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold">Berat / Kuantitas</Label>
-              <div className="relative">
-                <Input 
-                  type="number" 
-                  step="0.1" 
-                  value={formData.weight} 
-                  onChange={(e) => setFormData({ ...formData, weight: e.target.value })} 
-                  placeholder="Misal: 2.5"
-                  className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm pr-12 font-mono"
-                  required 
-                />
-                <div className="absolute right-3.5 top-2.5 text-xs text-muted-foreground font-mono">
-                  {formData.service_id ? (services.find(s => s.id.toString() === formData.service_id)?.unit || 'Kg') : 'Kg'}
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold">Foto Kondisi Pakaian {editId && '(Kosongkan jika tak diubah)'}</Label>
-              <div className="border border-dashed border-border rounded-xl p-4 bg-background flex flex-col items-center justify-center gap-2 hover:border-primary/50 transition-colors relative cursor-pointer group">
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleClothesPhotoChange} 
-                  className="absolute inset-0 opacity-0 cursor-pointer" 
-                />
-                {photoPreview ? (
-                  <div className="relative w-full max-h-[140px] flex items-center justify-center overflow-hidden rounded-lg border border-border">
-                    <img src={photoPreview} alt="Preview" className="h-full w-full object-contain bg-black/5" />
-                  </div>
-                ) : (
-                  <>
-                    <Camera className="text-muted-foreground h-6 w-6 group-hover:text-primary transition-colors" />
-                    <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-                      Klik untuk mengambil atau mengupload foto
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-            
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold">Metode Pembayaran</Label>
-              <select 
-                className="flex h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all" 
-                value={formData.payment_method} 
-                onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-              >
-                <option value="cash" className="bg-card text-foreground">Tunai (Cash)</option>
-                <option value="transfer" className="bg-card text-foreground">Transfer Bank</option>
-              </select>
-            </div>
-            
-            <DialogFooter className="pt-4 border-t border-border/60 mt-4">
-              <Button type="submit" disabled={isSubmitting} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-2">
-                {isSubmitting ? <Loader2 className="animate-spin" /> : 'Simpan Transaksi'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* DETAIL DRAWER / NOTA */}
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto bg-card border-border text-foreground rounded-2xl p-6">
-          <DialogHeader className="print:hidden">
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground border-b border-border/60 pb-3">
-              <Receipt className="text-primary" /> Detail Nota Transaksi
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedTrx && (
-            <div id="print-receipt" className="space-y-6 p-1 print:p-0 text-foreground">
-              {/* Store Branding (ala kasir modern) */}
-              <div className="text-center space-y-1.5 pb-4 border-b border-dashed border-border/80">
-                <div className="flex justify-center print:hidden">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
-                    <WashingMachine className="w-6 h-6" />
+      ) : (
+        /* CARD GRID VIEW MODE */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredTransactions.map((trx, i) => {
+            const name = trx.customer?.user?.name || 'Pelanggan';
+            const avatarColor = avatarColors[i % avatarColors.length];
+            return (
+              <div key={trx.id} className="group bg-card border border-border/80 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300 flex flex-col">
+                {/* Photo Container */}
+                <div className="h-48 w-full bg-muted relative overflow-hidden shrink-0 border-b border-border/50">
+                  {trx.clothes_photo ? (
+                    <img 
+                      src={`${STORAGE_URL}${trx.clothes_photo}`} 
+                      alt="Kondisi Pakaian" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-505" 
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/60 gap-2 bg-neutral-50 dark:bg-neutral-900/20">
+                      <Camera size={32} className="stroke-[1.5]" />
+                      <span className="text-[10px] font-mono tracking-wider">TIDAK ADA FOTO</span>
+                    </div>
+                  )}
+                  {/* Invoice Code Badge overlay */}
+                  <div className="absolute top-3 left-3 bg-neutral-900/80 dark:bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold tracking-wider">
+                    {trx.invoice_code}
                   </div>
                 </div>
-                <h3 className="font-bold text-base tracking-tight text-foreground">CDC LAUNDRY & DRY CLEAN</h3>
-                <p className="text-[10px] text-muted-foreground leading-normal max-w-[240px] mx-auto font-mono">
-                  Jl. Merdeka Raya No. 12, Jakarta Selatan<br />
-                  Telp/WA: 0812-3456-7890
+
+                {/* Content Body */}
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="space-y-3">
+                    {/* Customer & Service Info */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-[10px] font-bold font-mono shrink-0 ${avatarColor}`}>
+                          {getInitials(name)}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-foreground text-sm block leading-tight">{name}</span>
+                          <span className="text-[10px] text-muted-foreground block font-mono mt-0.5">{trx.service?.service_name || 'Layanan'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Weight/Kuantitas */}
+                    <div className="bg-muted/40 p-2.5 rounded-xl border border-border/60 flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Kuantitas:</span>
+                      <span className="font-semibold text-foreground font-mono">{trx.weight} {trx.service?.unit || 'Kg'}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2 border-t border-border/60">
+                    {/* Status Select */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-muted-foreground font-mono uppercase font-bold">Status:</span>
+                      <select 
+                        className={`h-8 rounded-lg border px-2 text-xs font-semibold font-mono bg-background border-border text-foreground hover:bg-muted/80 cursor-pointer focus:outline-none transition-all duration-205 ${getStatusStyles(trx.status)}`} 
+                        value={trx.status} 
+                        onChange={(e) => handleStatusChange(trx.id, e.target.value)}
+                      >
+                        <option value="antrian" className="bg-card text-amber-500">Antrian</option>
+                        <option value="dicuci" className="bg-card text-blue-500">Dicuci</option>
+                        <option value="disetrika" className="bg-card text-purple-500">Disetrika</option>
+                        <option value="siap diambil" className="bg-card text-emerald-500">Siap Diambil</option>
+                        <option value="diambil" className="bg-card text-muted-foreground">Sudah Diambil</option>
+                      </select>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-between gap-1.5 pt-1">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted h-9 rounded-xl gap-1.5" 
+                        onClick={() => handleViewDetail(trx)}
+                      >
+                        <Eye size={13} /> Detail
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 border-border text-xs text-primary hover:text-primary-foreground hover:bg-primary h-9 rounded-xl gap-1.5" 
+                        onClick={() => handleEditOpen(trx)}
+                      >
+                        <Edit size={13} /> Edit
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="border-border text-destructive hover:text-destructive-foreground hover:bg-destructive h-9 w-9 p-0 rounded-xl" 
+                        onClick={() => handleDelete(trx.id)}
+                      >
+                        <Trash2 size={13} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* FORM INPUT/EDIT SLIDE-OVER DRAWER */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-300 animate-in fade-in"
+            onClick={() => setIsModalOpen(false)}
+          />
+          {/* Slide-over Drawer Panel */}
+          <div className="relative w-full max-w-md h-full bg-card border-l border-border shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-300 ease-in-out text-foreground">
+            
+            {/* Drawer Header */}
+            <div className="p-6 border-b border-border/60 flex items-center justify-between shrink-0">
+              <div className="space-y-1">
+                <h2 className="text-base font-bold text-foreground">
+                  {editId ? 'Ubah Nota Transaksi' : 'Buat Nota Transaksi Baru'}
+                </h2>
+                <p className="text-[11px] text-muted-foreground font-mono">
+                  {editId ? `Mengedit Transaksi #${editId}` : 'Isi detail operasional pakaian pelanggan'}
                 </p>
               </div>
+              <button 
+                type="button" 
+                onClick={() => setIsModalOpen(false)}
+                className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
 
-              {/* Receipt Metadata */}
-              <div className="grid grid-cols-2 gap-4 text-xs font-mono py-1">
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Nomor Nota</p>
-                  <p className="font-bold text-primary text-sm mt-0.5 print:text-foreground">{selectedTrx.invoice_code}</p>
+            {/* Drawer Form Body */}
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 no-scrollbar">
+                {/* Pelanggan */}
+                <div className="space-y-1.5">
+                  <Label className="text-muted-foreground text-xs font-semibold">Pelanggan</Label>
+                  <select 
+                    className="flex h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all" 
+                    value={formData.customer_id} 
+                    onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })} 
+                    required
+                  >
+                    <option value="" className="bg-card text-muted-foreground">-- Pilih Pelanggan --</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id} className="bg-card text-foreground">
+                        {c.user?.name} ({c.phone})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider flex items-center gap-1 justify-end">
-                    Tanggal Masuk
-                  </p>
-                  <p className="text-foreground font-medium mt-0.5">
-                    {new Date(selectedTrx.created_at).toLocaleDateString('id-ID', { 
+                
+                {/* Layanan */}
+                <div className="space-y-1.5">
+                  <Label className="text-muted-foreground text-xs font-semibold">Layanan</Label>
+                  <select 
+                    className="flex h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all" 
+                    value={formData.service_id} 
+                    onChange={(e) => setFormData({ ...formData, service_id: e.target.value })} 
+                    required
+                  >
+                    <option value="" className="bg-card text-muted-foreground">-- Pilih Layanan --</option>
+                    {services.map((s) => (
+                      <option key={s.id} value={s.id} className="bg-card text-foreground">
+                        {s.service_name} ({s.unit})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                {/* Berat / Kuantitas */}
+                <div className="space-y-1.5">
+                  <Label className="text-muted-foreground text-xs font-semibold">Berat / Kuantitas</Label>
+                  <div className="relative">
+                    <Input 
+                      type="number" 
+                      step="0.1" 
+                      value={formData.weight} 
+                      onChange={(e) => setFormData({ ...formData, weight: e.target.value })} 
+                      placeholder="Misal: 2.5"
+                      className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm pr-12 font-mono h-11"
+                      required 
+                    />
+                    <div className="absolute right-3.5 top-3.5 text-xs text-muted-foreground font-mono">
+                      {formData.service_id ? (services.find(s => s.id.toString() === formData.service_id)?.unit || 'Kg') : 'Kg'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Estimasi Harga */}
+                {(() => {
+                  const selectedService = services.find(s => s.id.toString() === formData.service_id);
+                  if (!selectedService || !formData.weight) return null;
+                  const estimated = Number(selectedService.price) * Number(formData.weight);
+                  return (
+                    <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl space-y-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <span className="text-[10px] font-bold text-primary uppercase tracking-widest block font-mono">Estimasi Biaya</span>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xs text-muted-foreground">
+                          {formData.weight} {selectedService.unit} × Rp {Number(selectedService.price).toLocaleString('id-ID')}
+                        </span>
+                        <span className="text-sm font-extrabold text-foreground font-mono">
+                          Rp {estimated.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+                
+                {/* Foto Kondisi Pakaian */}
+                <div className="space-y-1.5">
+                  <Label className="text-muted-foreground text-xs font-semibold">Foto Kondisi Pakaian {editId && '(Kosongkan jika tak diubah)'}</Label>
+                  <div className="border border-dashed border-border rounded-xl p-4 bg-background flex flex-col items-center justify-center gap-2 hover:border-primary/50 transition-colors relative cursor-pointer group">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleClothesPhotoChange} 
+                      className="absolute inset-0 opacity-0 cursor-pointer" 
+                    />
+                    {photoPreview ? (
+                      <div className="relative w-full max-h-[160px] flex items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/40">
+                        <img src={photoPreview} alt="Preview" className="h-full max-h-[140px] w-full object-contain" />
+                      </div>
+                    ) : (
+                      <>
+                        <Camera className="text-muted-foreground h-6 w-6 group-hover:text-primary transition-colors" />
+                        <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+                          Klik untuk mengambil atau mengupload foto
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hidden field for payment method to support DB payload constraints */}
+                <input type="hidden" name="payment_method" value="cash" />
+              </div>
+              
+              {/* Sticky Footer */}
+              <div className="p-6 border-t border-border/60 bg-muted/20 flex gap-3 shrink-0">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="flex-1 border-border text-foreground hover:bg-muted rounded-xl"
+                  onClick={() => setIsModalOpen(false)}
+                >
+                  Batal
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting} 
+                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+                >
+                  {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : 'Simpan Transaksi'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DETAIL MODAL / NOTA (Operational Only) */}
+      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto bg-card border-border text-foreground rounded-2xl p-6 no-scrollbar">
+          {selectedTrx && (
+            <div id="print-receipt" className="space-y-6 text-foreground print:p-0">
+              
+              {/* 1. TOP HEADER BANNER */}
+              <div className="bg-primary text-primary-foreground p-6 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 shadow-md">
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 font-mono">Invoice Code</span>
+                  <h2 className="text-2xl font-black tracking-tight font-mono">{selectedTrx.invoice_code}</h2>
+                  <p className="text-[11px] opacity-75 font-mono">
+                    Masuk: {new Date(selectedTrx.created_at).toLocaleDateString('id-ID', { 
                       day: 'numeric', 
-                      month: 'short', 
+                      month: 'long', 
                       year: 'numeric', 
                       hour: '2-digit', 
                       minute: '2-digit' 
                     })}
                   </p>
                 </div>
-              </div>
-
-              {/* Customer & Service Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/40 border border-border p-4 rounded-2xl text-xs">
-                <div className="space-y-2">
-                  <span className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider block">
-                    Pelanggan
-                  </span>
-                  <div>
-                    <p className="font-semibold text-foreground">{selectedTrx.customer?.user?.name || 'Pelanggan'}</p>
-                    <p className="text-muted-foreground font-mono mt-0.5">
-                      {selectedTrx.customer?.phone ? (
-                        <a 
-                          href={formatWhatsAppLink(selectedTrx.customer.phone)} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="inline-flex items-center gap-1 text-primary hover:underline hover:text-primary/80 transition-colors print:no-underline print:text-foreground"
-                        >
-                          {selectedTrx.customer.phone}
-                        </a>
-                      ) : (
-                        '-'
-                      )}
-                    </p>
-                    <p className="text-muted-foreground mt-1 leading-relaxed max-w-[200px] break-words">
-                      {selectedTrx.customer?.address || '-'}
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-2 border-t sm:border-t-0 sm:border-l border-border/80 pt-3 sm:pt-0 sm:pl-4">
-                  <span className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider block">
-                    Layanan Laundry
-                  </span>
-                  <div>
-                    <p className="font-semibold text-foreground">{selectedTrx.service?.service_name || 'Layanan'}</p>
-                    <p className="text-muted-foreground mt-0.5 font-mono">
-                      Rp {Number(selectedTrx.service?.price).toLocaleString('id-ID')} / {selectedTrx.service?.unit || 'Kg'}
-                    </p>
-                    <p className="text-muted-foreground mt-1 italic text-[10px] line-clamp-2">
-                      {selectedTrx.service?.description || 'Tidak ada deskripsi.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Detailed Calculations */}
-              <div className="space-y-3 border-b border-dashed border-border pb-5 text-sm">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-muted-foreground font-mono">Kuantitas / Berat</span>
-                  <span className="font-semibold text-foreground font-mono">{selectedTrx.weight} {selectedTrx.service?.unit || 'Kg'}</span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-muted-foreground font-mono">Metode Pembayaran</span>
-                  <Badge variant="outline" className="capitalize font-mono border-border text-foreground bg-muted px-2 py-0.5 rounded-lg text-[10px] font-medium">
-                    {selectedTrx.payment_method === 'cash' ? '💵 Cash/Tunai' : '💳 Transfer Bank'}
+                <div className="flex flex-col sm:items-end gap-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 font-mono">Status Cucian</span>
+                  <Badge className="text-xs uppercase font-extrabold tracking-wide mt-1 px-3 py-1 rounded-full bg-neutral-900/30 text-white border border-white/20">
+                    {selectedTrx.status.toUpperCase()}
                   </Badge>
                 </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-muted-foreground font-mono">Status Cucian</span>
-                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${getStatusStyles(selectedTrx.status)}`}>
-                    {selectedTrx.status}
-                  </span>
-                </div>
+              </div>
+
+              {/* 2. PROGRESS CUCIAN TIMELINE STEPPER */}
+              {(() => {
+                const steps = ['antrian', 'dicuci', 'disetrika', 'siap diambil', 'diambil'];
+                const stepLabels: Record<string, string> = {
+                  'antrian': 'Antrian',
+                  'dicuci': 'Dicuci',
+                  'disetrika': 'Disetrika',
+                  'siap diambil': 'Siap Diambil',
+                  'diambil': 'Selesai'
+                };
+                const currentStepIdx = steps.indexOf(selectedTrx.status.toLowerCase());
                 
-                <div className="pt-3 border-t border-border flex justify-between items-baseline">
-                  <span className="text-xs font-bold text-foreground uppercase tracking-wider">TOTAL BAYAR</span>
-                  <span className="text-primary text-xl font-bold font-mono print:text-foreground">
-                    Rp {Number(selectedTrx.total_price).toLocaleString('id-ID')}
-                  </span>
+                return (
+                  <div className="bg-muted/45 border border-border/85 p-5 rounded-2xl space-y-4 print:hidden">
+                    <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block font-mono">
+                      Progress Cucian
+                    </span>
+                    <div className="relative flex items-center justify-between w-full pt-2 pb-1 px-4">
+                      {/* Background connecting line */}
+                      <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-[3px] bg-neutral-200 dark:bg-neutral-805 z-0" />
+                      
+                      {/* Active connecting line */}
+                      <div 
+                        className="absolute left-6 top-1/2 -translate-y-1/2 h-[3px] bg-primary transition-all duration-500 z-0" 
+                        style={{ width: `${(Math.max(0, currentStepIdx) / (steps.length - 1)) * 100}%` }}
+                      />
+
+                      {steps.map((step, idx) => {
+                        const isActive = idx <= currentStepIdx;
+                        const isCurrent = idx === currentStepIdx;
+                        
+                        return (
+                          <div key={step} className="flex flex-col items-center z-10 relative">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all duration-300 ${
+                              isCurrent
+                                ? 'bg-primary border-primary text-white scale-110 shadow-lg shadow-primary/25'
+                                : isActive
+                                  ? 'bg-neutral-900 border-neutral-900 dark:bg-white dark:border-white text-white dark:text-neutral-950 font-bold'
+                                  : 'bg-card border-neutral-200 dark:border-neutral-850 text-neutral-400 dark:text-neutral-600'
+                            }`}>
+                              <span className="text-[10px] font-bold">{idx + 1}</span>
+                            </div>
+                            <span className={`text-[10px] font-bold mt-2 tracking-tight whitespace-nowrap ${
+                              isCurrent 
+                                ? 'text-primary' 
+                                : isActive 
+                                  ? 'text-foreground' 
+                                  : 'text-neutral-400 dark:text-neutral-600'
+                            }`}>
+                              {stepLabels[step]}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 3. AREA UPDATE STATUS */}
+              <div className="flex flex-col sm:flex-row items-center gap-3 bg-muted/40 border border-border/80 p-4 rounded-xl print:hidden">
+                <div className="w-full sm:flex-1">
+                  <label className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block font-mono mb-1.5">
+                    Ubah Status Cucian
+                  </label>
+                  <select 
+                    value={selectedTrx.status} 
+                    onChange={(e) => {
+                      setSelectedTrx({ ...selectedTrx, status: e.target.value });
+                    }}
+                    className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all"
+                  >
+                    <option value="antrian">Antrian</option>
+                    <option value="dicuci">Dicuci</option>
+                    <option value="disetrika">Disetrika</option>
+                    <option value="siap diambil">Siap Diambil</option>
+                    <option value="diambil">Selesai / Diambil</option>
+                  </select>
                 </div>
+                <Button 
+                  onClick={async () => {
+                    setIsSubmitting(true);
+                    try {
+                      await apiClient.patch(`/transactions/${selectedTrx.id}/status`, { status: selectedTrx.status });
+                      toast.success('Status transaksi berhasil diperbarui.');
+                      fetchData(); 
+                    } catch (err) {
+                      toast.error('Gagal memperbarui status!');
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto h-10 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl shrink-0 sm:mt-5 transition-all"
+                >
+                  {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : 'Simpan Perubahan'}
+                </Button>
               </div>
 
-              {/* Photos section (hidden on print) */}
-              <div className="space-y-2.5 print:hidden">
-                <span className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider block">Foto Bukti Kondisi Pakaian:</span>
-                {selectedTrx.clothes_photo ? (
-                  <div className="border border-border rounded-xl p-2 bg-muted overflow-hidden group">
-                    <img 
-                      src={`${STORAGE_URL}${selectedTrx.clothes_photo}`} 
-                      alt="Foto pakaian" 
-                      className="w-full max-h-[240px] object-contain rounded-lg bg-black/5 group-hover:scale-[1.01] transition-transform duration-300" 
-                    />
+              {/* 4. BOTTOM TWO COLUMNS LAYOUT */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Info Pelanggan */}
+                <div className="space-y-4 border border-border/80 p-5 rounded-2xl bg-card/50">
+                  <h4 className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider font-mono border-b border-border/60 pb-2">
+                    Info Pelanggan
+                  </h4>
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-xs font-mono">
+                      {getInitials(selectedTrx.customer?.user?.name)}
+                    </div>
+                    <div>
+                      <h5 className="font-extrabold text-sm text-foreground leading-tight">
+                        {selectedTrx.customer?.user?.name || 'Pelanggan'}
+                      </h5>
+                      <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                        ID: #CST-{selectedTrx.customer?.id}
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  <div className="border border-dashed border-border rounded-xl h-24 flex flex-col items-center justify-center bg-muted/40 text-muted-foreground">
-                    <Camera size={20} className="stroke-[1.5] mb-1.5" />
-                    <p className="text-xs italic font-mono">Tidak ada lampiran foto kondisi.</p>
+
+                  <div className="space-y-3.5 text-xs">
+                    <div>
+                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block font-mono uppercase">Email Address</span>
+                      <span className="text-foreground font-semibold mt-0.5 block truncate">
+                        {selectedTrx.customer?.user?.email || '-'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block font-mono uppercase">WhatsApp / HP</span>
+                      <span className="text-foreground font-semibold mt-0.5 block font-mono">
+                        {selectedTrx.customer?.phone ? (
+                          <a 
+                            href={formatWhatsAppLink(selectedTrx.customer.phone)} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-primary hover:underline hover:text-primary/80 transition-colors inline-flex items-center gap-1"
+                          >
+                            {selectedTrx.customer.phone} ↗
+                          </a>
+                        ) : (
+                          '-'
+                        )}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block font-mono uppercase">Alamat Pengiriman</span>
+                      <p className="text-foreground leading-relaxed mt-1 bg-muted/40 p-3 rounded-xl border border-border/60 whitespace-pre-wrap">
+                        {selectedTrx.customer?.address || 'Tidak ada info alamat.'}
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
+
+                {/* Detail Operasional Cucian */}
+                <div className="space-y-4 border border-border/80 p-5 rounded-2xl bg-card/50">
+                  <h4 className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider font-mono border-b border-border/60 pb-2">
+                    Detail Cucian
+                  </h4>
+                  <div className="space-y-4">
+                    <div className="border border-border/60 rounded-xl overflow-hidden text-xs">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-muted/50 border-b border-border/60">
+                            <th className="p-2.5 font-semibold text-neutral-500 dark:text-neutral-400 font-mono text-[10px]">LAYANAN / KETERANGAN</th>
+                            <th className="p-2.5 text-right font-semibold text-neutral-500 dark:text-neutral-400 font-mono text-[10px]">KUANTITAS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/65">
+                          <tr>
+                            <td className="p-2.5">
+                              <span className="font-extrabold text-foreground block">
+                                {selectedTrx.service?.service_name || 'Layanan Laundry'}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-mono block mt-0.5">
+                                Unit: {selectedTrx.service?.unit || 'Kg'}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-bold text-foreground">
+                              {selectedTrx.weight} {selectedTrx.service?.unit || 'Kg'}
+                            </td>
+                          </tr>
+                          <tr className="bg-muted/10">
+                            <td className="p-2.5 text-neutral-500 dark:text-neutral-400">
+                              Status Cucian
+                            </td>
+                            <td className="p-2.5 text-right font-bold text-foreground uppercase tracking-wide font-mono text-[10px]">
+                              {selectedTrx.status}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Lampiran Foto Bukti Kondisi */}
+                    {selectedTrx.clothes_photo && (
+                      <div className="pt-2 border-t border-border/40">
+                        <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block font-mono uppercase mb-1.5">
+                          Lampiran Bukti Pakaian
+                        </span>
+                        <div className="border border-border/80 rounded-xl p-1 bg-muted/40 overflow-hidden max-h-[140px] flex items-center justify-center">
+                          <img 
+                            src={`${STORAGE_URL}${selectedTrx.clothes_photo}`} 
+                            alt="Bukti pakaian" 
+                            className="max-h-32 object-contain rounded-lg hover:scale-105 transition-transform duration-300" 
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </div>
 
-              {/* Footer Greeting (kasir modern style) */}
-              <div className="text-center space-y-1 pt-2 border-t border-dashed border-border/80">
-                <p className="text-xs font-semibold text-foreground">Terima Kasih Atas Kepercayaan Anda</p>
+              {/* Store Footer Print Message */}
+              <div className="text-center space-y-1 pt-4 border-t border-dashed border-border/80">
+                <p className="text-xs font-bold text-foreground">Terima Kasih Atas Kepercayaan Anda</p>
                 <p className="text-[9px] text-muted-foreground leading-normal max-w-[320px] mx-auto font-mono">
                   Mohon periksa cucian sebelum meninggalkan outlet. Komplain maksimal 24 jam setelah cucian diambil.
                 </p>
               </div>
+
             </div>
           )}
 
-          <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2 print:hidden">
+          <DialogFooter className="pt-4 flex flex-col sm:flex-row gap-2 print:hidden border-t border-border/60">
             <Button 
-              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium"
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold transition-all"
               onClick={() => window.print()}
             >
               Cetak Struk (Print)
             </Button>
             <Button 
               variant="outline"
-              className="flex-1 border-border text-foreground hover:bg-muted rounded-xl" 
+              className="flex-1 border-border text-foreground hover:bg-muted rounded-xl transition-all" 
               onClick={() => setIsDetailOpen(false)}
             >
               Tutup Nota

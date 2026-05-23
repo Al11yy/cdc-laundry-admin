@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '@/api/axios';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
-  Loader2, Plus, ReceiptText, 
-  ArrowUpRight, TrendingUp, Calendar,
+  Loader2, Plus, 
+  ArrowUpRight, Calendar,
   ChevronDown, FileText
 } from 'lucide-react';
 import { 
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell
 } from 'recharts';
 import { toast } from 'sonner';
@@ -17,6 +17,8 @@ import { toast } from 'sonner';
 export default function Dashboard() {
   const navigate = useNavigate();
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [custCount, setCustCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [globalDateFilter, setGlobalDateFilter] = useState<'hari-ini' | 'minggu-ini' | 'bulan-ini' | 'sepanjang-masa'>('minggu-ini');
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
@@ -24,15 +26,19 @@ export default function Dashboard() {
   const fetchData = async (filterVal: string) => {
     try {
       const params = filterVal === 'sepanjang-masa' ? {} : { filter: filterVal };
-      const [resIncome, resStats, resTrx] = await Promise.all([
+      const [resIncome, resStats, resTrx, resCust] = await Promise.all([
         apiClient.get('/reports/income', { params }),
         apiClient.get('/reports/statistics', { params }),
-        apiClient.get('/transactions')
+        apiClient.get('/transactions'),
+        apiClient.get('/customers')
       ]);
       console.log('Income reports loaded:', resIncome.data);
       console.log('Statistics reports loaded:', resStats.data);
       const trxList = resTrx.data?.data || resTrx.data || [];
       setAllTransactions(trxList);
+      const custList = resCust.data?.data || resCust.data || [];
+      setAllCustomers(custList);
+      setCustCount(custList.length);
     } catch (error) { 
       console.error("Gagal load dashboard", error); 
     } finally { 
@@ -70,6 +76,27 @@ export default function Dashboard() {
   };
 
   const filteredTransactions = getFilteredTransactions();
+
+  const getFilteredCustomers = () => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    return allCustomers.filter((c: any) => {
+      if (!c.created_at) return false;
+      const cDate = new Date(c.created_at);
+      
+      if (globalDateFilter === 'hari-ini') {
+        return cDate >= todayStart;
+      } else if (globalDateFilter === 'minggu-ini') {
+        const startOfWeek = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return cDate >= startOfWeek;
+      } else if (globalDateFilter === 'bulan-ini') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        return cDate >= startOfMonth;
+      }
+      return true;
+    });
+  };
 
   const totalIncomeFiltered = filteredTransactions
     .reduce((sum: number, t: any) => sum + Number(t.total_price || 0), 0);
@@ -209,6 +236,79 @@ export default function Dashboard() {
 
   const chartData = getChartData();
 
+  const getBarChartData = () => {
+    const dataMap: { [key: string]: { total: number; completed: number } } = {};
+    
+    if (globalDateFilter === 'hari-ini') {
+      const hours = ['08:00', '12:00', '16:00', '20:00'];
+      hours.forEach(h => { dataMap[h] = { total: 0, completed: 0 }; });
+      filteredTransactions.forEach((t: any) => {
+        if (!t.created_at) return;
+        const date = new Date(t.created_at);
+        const hour = date.getHours();
+        const bracket = hours.find((h, idx) => {
+          const hVal = parseInt(h.split(':')[0]);
+          const nextHVal = hours[idx + 1] ? parseInt(hours[idx + 1].split(':')[0]) : 24;
+          return hour >= hVal && hour < nextHVal;
+        }) || '08:00';
+        dataMap[bracket].total += 1;
+        if (t.status === 'siap diambil' || t.status === 'diambil') {
+          dataMap[bracket].completed += 1;
+        }
+      });
+    } else if (globalDateFilter === 'minggu-ini') {
+      const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+      const last7Days: string[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        last7Days.push(days[d.getDay()]);
+      }
+      last7Days.forEach(day => { dataMap[day] = { total: 0, completed: 0 }; });
+      
+      filteredTransactions.forEach((t: any) => {
+        if (!t.created_at) return;
+        const date = new Date(t.created_at);
+        const dayName = days[date.getDay()];
+        if (dayName in dataMap) {
+          dataMap[dayName].total += 1;
+          if (t.status === 'siap diambil' || t.status === 'diambil') {
+            dataMap[dayName].completed += 1;
+          }
+        }
+      });
+    } else {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      const last6Months: string[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        last6Months.push(months[d.getMonth()]);
+      }
+      last6Months.forEach(m => { dataMap[m] = { total: 0, completed: 0 }; });
+      
+      filteredTransactions.forEach((t: any) => {
+        if (!t.created_at) return;
+        const date = new Date(t.created_at);
+        const label = months[date.getMonth()];
+        if (label in dataMap) {
+          dataMap[label].total += 1;
+          if (t.status === 'siap diambil' || t.status === 'diambil') {
+            dataMap[label].completed += 1;
+          }
+        }
+      });
+    }
+    
+    return Object.entries(dataMap).map(([key, val]) => ({
+      name: key,
+      Total: val.total,
+      Selesai: val.completed
+    }));
+  };
+
+  const barChartData = getBarChartData();
+
   // Aksi Ekspor Laporan Rekapitulasi Kasir
   const handleExportReport = () => {
     if (filteredTransactions.length === 0) {
@@ -281,54 +381,40 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8 bg-background">
+    <div className="space-y-6 bg-background font-sans antialiased text-foreground">
       
-      {/* HEADER SECTION */}
-      <div className="flex flex-col gap-5">
-        {/* Row 1: Title & Sync */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
-            <p className="text-xs text-muted-foreground mt-1">
-              Status operasi, transaksi masuk, dan rekapitulasi keuangan laundry.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              onClick={() => navigate('/dashboard/transactions')} 
-              className="bg-primary hover:bg-primary/95 text-white gap-1.5 font-medium text-xs h-9 px-4 rounded-xl shadow-md transition-all duration-200 shrink-0"
-            >
-              <Plus size={14} /> Catat Transaksi
-            </Button>
-          </div>
+      {/* 0. HEADER CONTROL BAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+        <div>
+          <h1 className="text-sm font-bold tracking-tight text-foreground uppercase">Overview</h1>
+          <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5">
+            Real-time status dan metrik operasional laundry Anda.
+          </p>
         </div>
- 
-        {/* Row 2: Global Controls Toolbar */}
-        <div className="flex items-center justify-between gap-3 bg-muted/40 border border-border/60 rounded-2xl p-3 shadow-sm">
-          {/* Sisi Kiri: Global Date Filter */}
+        
+        <div className="flex items-center gap-2">
+          {/* Global Date Filter Dropdown */}
           <div className="relative">
             <Button 
               variant="outline" 
               size="sm" 
               onClick={() => setDateFilterOpen(!dateFilterOpen)}
-              className="h-9 text-xs gap-1.5 rounded-xl border-border bg-card hover:bg-muted text-foreground transition-all duration-200"
+              className="h-8 text-xs gap-1.5 rounded-xl border-neutral-200 dark:border-neutral-800 bg-card hover:bg-neutral-100 dark:hover:bg-neutral-900 text-foreground transition-all"
             >
               <Calendar size={12} className="text-primary" />
               <span>
-                Filter: {
-                  globalDateFilter === 'hari-ini' ? 'Hari Ini' :
-                  globalDateFilter === 'minggu-ini' ? 'Minggu Ini' :
-                  globalDateFilter === 'bulan-ini' ? 'Bulan Ini' :
-                  'Sepanjang Masa'
-                }
+                {globalDateFilter === 'hari-ini' ? 'Hari Ini' :
+                 globalDateFilter === 'minggu-ini' ? 'Minggu Ini' :
+                 globalDateFilter === 'bulan-ini' ? 'Bulan Ini' :
+                 'Sepanjang Masa'}
               </span>
-              <ChevronDown size={12} className="text-muted-foreground" />
+              <ChevronDown size={10} className="text-neutral-400" />
             </Button>
             
             {dateFilterOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setDateFilterOpen(false)} />
-                <div className="absolute left-0 mt-1.5 w-40 rounded-xl border border-border bg-card p-1 shadow-lg z-20 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="absolute right-0 mt-1 w-40 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-card p-1 shadow-lg z-20 animate-in fade-in slide-in-from-top-1 duration-150">
                   {[
                     { value: 'hari-ini', label: 'Hari Ini' },
                     { value: 'minggu-ini', label: 'Minggu Ini' },
@@ -344,10 +430,10 @@ export default function Dashboard() {
                           description: `Menampilkan data untuk: ${item.label}`
                         });
                       }}
-                      className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors ${
+                      className={`w-full text-left px-3 py-1.5 text-xs rounded-lg transition-colors ${
                         globalDateFilter === item.value 
-                          ? 'bg-primary/10 text-primary font-semibold' 
-                          : 'text-foreground hover:bg-muted'
+                          ? 'bg-neutral-100 dark:bg-white/5 text-foreground font-semibold' 
+                          : 'text-neutral-500 hover:bg-neutral-50 dark:hover:bg-white/5'
                       }`}
                     >
                       {item.label}
@@ -358,152 +444,208 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Sisi Kanan: Ekspor Laporan */}
-          <div>
-            <Button 
-              onClick={handleExportReport} 
-              variant="outline"
-              size="sm"
-              className="h-9 text-xs gap-1.5 rounded-xl border-border bg-card hover:bg-muted text-foreground transition-all duration-200 cursor-pointer"
-            >
-              <FileText size={12} className="text-primary" />
-              <span>Ekspor Laporan</span>
-            </Button>
-          </div>
+          {/* Export button */}
+          <Button 
+            onClick={handleExportReport} 
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5 rounded-xl border-neutral-200 dark:border-neutral-800 bg-card hover:bg-neutral-100 dark:hover:bg-neutral-900 text-foreground transition-all cursor-pointer"
+          >
+            <FileText size={12} className="text-primary" />
+            <span>Ekspor CSV</span>
+          </Button>
+
+          {/* Catat Transaksi button */}
+          <Button 
+            onClick={() => navigate('/dashboard/transactions')} 
+            className="bg-primary hover:bg-primary/90 text-white gap-1.5 font-medium text-xs h-8 px-3.5 rounded-xl shadow-md transition-all shrink-0"
+          >
+            <Plus size={13} /> <span>Catat</span>
+          </Button>
         </div>
       </div>
 
-      {/* 1. CARDS UTAMA KEUANGAN & OPERASIONAL (3 Columns) */}
-      <div className="grid gap-6 sm:grid-cols-3">
-        <Card className="bg-card border-border rounded-2xl shadow-sm relative overflow-hidden group p-5">
-          <CardHeader className="p-0 pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-              <span>Total Pendapatan</span>
-              <TrendingUp size={16} className="text-primary" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 pt-2">
-            <div className="text-3xl font-bold tracking-tight text-foreground">
-              Rp {totalIncomeAllTime.toLocaleString('id-ID')}
+      {/* 1. ROW 1: 2X2 CARDS GRID & PROJECTIONS BAR CHART */}
+      <div className="grid gap-6 lg:grid-cols-12 items-stretch">
+        
+        {/* Left column: 2x2 cards */}
+        <div className="lg:col-span-6 grid grid-cols-2 gap-4">
+          
+          {/* Card 1: Pelanggan (Soft Pastel CDC Green) */}
+          <div className="bg-[#f0f9eb] border border-[#7ec143]/30 text-slate-800 dark:bg-[#7ec143]/10 dark:border-[#7ec143]/20 dark:text-[#8cd64f] rounded-[24px] p-5 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-slate-650 dark:text-[#8cd64f]/80 uppercase tracking-wider block">Pelanggan</span>
+              <div className="text-3xl font-bold tracking-tight text-slate-900 dark:text-[#8cd64f]">{custCount}</div>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1 font-mono">
-              <span className="text-primary font-semibold flex items-center">
-                +12% <ArrowUpRight size={10} />
+            <div className="text-[10px] font-medium text-slate-600 dark:text-[#8cd64f]/80 mt-6 flex items-center gap-1">
+              <span className="text-emerald-700 dark:text-[#8cd64f] font-bold flex items-center">
+                +11.01% <ArrowUpRight size={10} />
               </span> 
-              dari bulan kemarin
-            </p>
-          </CardContent>
-          <div className="absolute right-0 bottom-0 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-all duration-300" />
-        </Card>
-
-        <Card className="bg-card border-border rounded-2xl shadow-sm relative overflow-hidden group p-5">
-          <CardHeader className="p-0 pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-              <span>{getPeriodLabel()}</span>
-              <Calendar size={16} className="text-muted-foreground" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 pt-2">
-            <div className="text-3xl font-bold tracking-tight text-foreground">
-              Rp {totalIncomeFiltered.toLocaleString('id-ID')}
+              <span>terdaftar</span>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1 font-mono">
+            <div className="absolute right-[-10px] bottom-[-10px] w-24 h-24 bg-[#7ec143]/10 rounded-full blur-xl group-hover:bg-[#7ec143]/20 transition-all duration-300" />
+          </div>
+
+          {/* Card 2: Pelanggan Baru (Deep Dark Card) */}
+          <div className="bg-card border border-neutral-200 dark:border-neutral-900/60 rounded-[24px] p-5 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider block">Pelanggan Baru</span>
+              <div className="text-3xl font-bold tracking-tight text-foreground">{getFilteredCustomers().length}</div>
+            </div>
+            <div className="text-[10px] font-medium text-neutral-600 dark:text-neutral-400 mt-6 flex items-center gap-1">
+              <span className="text-emerald-600 dark:text-emerald-500 font-bold flex items-center">
+                +{getFilteredCustomers().length} <ArrowUpRight size={10} />
+              </span> 
+              <span>terdaftar baru</span>
+            </div>
+            <div className="absolute right-[-10px] bottom-[-10px] w-24 h-24 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-all duration-300" />
+          </div>
+
+          {/* Card 3: Pendapatan Periode Ini (Deep Dark Card) */}
+          <div className="bg-card border border-neutral-200 dark:border-neutral-900/60 rounded-[24px] p-5 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider block">{getPeriodLabel()}</span>
+              <div className="text-xl font-bold tracking-tight text-foreground truncate">
+                Rp {totalIncomeFiltered.toLocaleString('id-ID')}
+              </div>
+            </div>
+            <div className="text-[10px] font-medium text-neutral-600 dark:text-neutral-400 mt-6 flex items-center gap-1 truncate">
               {getPeriodSubtext()}
-            </p>
-          </CardContent>
-          <div className="absolute right-0 bottom-0 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-all duration-300" />
-        </Card>
-
-        <Card className="bg-card border-border rounded-2xl shadow-sm relative overflow-hidden group p-5">
-          <CardHeader className="p-0 pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-              <span>Transaksi Masuk</span>
-              <ReceiptText size={16} className="text-primary" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 pt-2">
-            <div className="text-3xl font-bold tracking-tight text-foreground">
-              {filteredTransactions.length} Transaksi
             </div>
-            <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1 font-mono">
-              Volume order dalam periode ini
-            </p>
-          </CardContent>
-          <div className="absolute right-0 bottom-0 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-all duration-300" />
-        </Card>
-      </div>
+            <div className="absolute right-[-10px] bottom-[-10px] w-24 h-24 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-all duration-300" />
+          </div>
 
-      {/* 2. STAT STATUS OPERASIONAL (Unified Status Bar) */}
-      <div className="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row items-stretch divide-y sm:divide-y-0 sm:divide-x divide-border shadow-sm gap-4 sm:gap-0">
-        <div className="flex-1 flex items-center justify-between px-4 py-1.5 sm:py-0">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-semibold text-muted-foreground font-mono">Antrian Baru</span>
+          {/* Card 4: Total Omzet (Soft Pastel CDC Blue) */}
+          <div className="bg-[#e6f4fc] border border-[#0082c3]/30 text-slate-800 dark:bg-[#0082c3]/10 dark:border-[#0082c3]/20 dark:text-[#009ceb] rounded-[24px] p-5 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-slate-650 dark:text-[#009ceb]/80 uppercase tracking-wider block">Total Omzet</span>
+              <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-[#009ceb] truncate">
+                Rp {totalIncomeAllTime.toLocaleString('id-ID')}
+              </div>
+            </div>
+            <div className="text-[10px] font-medium text-slate-600 dark:text-[#009ceb]/80 mt-6 flex items-center gap-1">
+              <span className="text-sky-800 dark:text-[#009ceb] font-bold flex items-center">
+                +30.1% <ArrowUpRight size={10} />
+              </span> 
+              <span>all-time growth</span>
+            </div>
+            <div className="absolute right-[-10px] bottom-[-10px] w-24 h-24 bg-[#0082c3]/10 rounded-full blur-xl group-hover:bg-[#0082c3]/20 transition-all duration-300" />
           </div>
-          <span className="text-lg font-bold text-foreground font-mono">{countByStatus('antrian')}</span>
-        </div>
-        
-        <div className="flex-1 flex items-center justify-between px-4 py-1.5 sm:py-0">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-primary/70" />
-            <span className="text-xs font-semibold text-muted-foreground font-mono">Sedang Diproses</span>
-          </div>
-          <span className="text-lg font-bold text-foreground font-mono">
-            {countByStatus('dicuci') + countByStatus('disetrika')}
-          </span>
+
         </div>
 
-        <div className="flex-1 flex items-center justify-between px-4 py-1.5 sm:py-0">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-primary/45" />
-            <span className="text-xs font-semibold text-muted-foreground font-mono">Siap Diambil</span>
-          </div>
-          <span className="text-lg font-bold text-foreground font-mono">{countByStatus('siap diambil')}</span>
-        </div>
-      </div>
-
-      {/* 3. GRAPHS, PIE CHART, WIDGETS, & RECENT TRANSACTIONS ACTIVITY FEED */}
-      <div className="grid gap-6 lg:grid-cols-12 items-start">
-        
-        {/* GRAFIK TREN PEMASUKAN (lg:col-span-5) */}
-        <Card className="bg-card border-border rounded-2xl shadow-sm lg:col-span-5 overflow-hidden p-5 flex flex-col h-[400px]">
-          <CardHeader className="p-0 pb-5 border-b border-border flex flex-row items-center justify-between">
+        {/* Right column: Projections vs Actuals double bar chart */}
+        <Card className="lg:col-span-6 bg-card border-neutral-100 dark:border-neutral-900/60 rounded-[28px] p-5 flex flex-col justify-between shadow-sm h-[260px] lg:h-auto">
+          <div className="pb-3 flex items-center justify-between">
             <div>
-              <CardTitle className="text-sm font-semibold text-foreground">Tren Pemasukan</CardTitle>
-              <p className="text-[10px] text-muted-foreground font-mono mt-0.5">Grafik perkembangan pendapatan laundry</p>
+              <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block">Volume Transaksi</span>
+              <CardTitle className="text-xs font-semibold text-foreground">Target vs Realisasi (Selesai)</CardTitle>
             </div>
-          </CardHeader>
-          <CardContent className="p-0 pt-5 flex-1 pr-2">
+            {/* Minimalist chart legends matching brand blue and brand green */}
+            <div className="flex items-center gap-3 text-[10px]">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded bg-[#0082c3]" />
+                <span className="text-neutral-450 dark:text-neutral-500">Total</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded bg-[#7ec143]" />
+                <span className="text-neutral-450 dark:text-neutral-500">Selesai</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 min-h-[150px] w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+              <BarChart data={barChartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }} barGap={3}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.2} vertical={false} />
+                <XAxis 
+                  dataKey="name" 
+                  stroke="var(--muted-foreground)" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false}
+                  dy={5}
+                />
+                <YAxis 
+                  stroke="var(--muted-foreground)" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false}
+                  dx={-5}
+                  allowDecimals={false}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'var(--card)', 
+                    borderColor: 'var(--border)', 
+                    borderRadius: '12px',
+                    color: 'var(--foreground)',
+                    fontSize: '11px',
+                    fontFamily: 'monospace'
+                  }}
+                  cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                />
+                <Bar 
+                  dataKey="Total" 
+                  fill="#0082c3" 
+                  radius={[4, 4, 0, 0]} 
+                  maxBarSize={12}
+                />
+                <Bar 
+                  dataKey="Selesai" 
+                  fill="#7ec143" 
+                  radius={[4, 4, 0, 0]} 
+                  maxBarSize={12}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
+
+      {/* 2. ROW 2: REVENUE LINE CHART & OPERATIONAL STATUS PROGRESS BARS */}
+      <div className="grid gap-6 lg:grid-cols-12 items-stretch">
+        
+        {/* Left side: Revenue Line Chart (Area Chart) */}
+        <Card className="lg:col-span-8 bg-card border-neutral-100 dark:border-neutral-900/60 rounded-[28px] p-5 flex flex-col h-[320px] shadow-sm">
+          <div className="pb-4 flex items-center justify-between border-b border-neutral-100 dark:border-neutral-900/40">
+            <div>
+              <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block">Keuangan</span>
+              <CardTitle className="text-xs font-semibold text-foreground">Tren Pemasukan Laundry</CardTitle>
+            </div>
+            <div className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500">
+              Nilai dalam Rupiah (Rp)
+            </div>
+          </div>
+          
+          <div className="flex-1 pt-6 pr-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="purpleGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.55}/>
-                    <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0.01}/>
+                  <linearGradient id="neonGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.25}/>
+                    <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0.005}/>
                   </linearGradient>
-                  <filter id="glow" x="-10%" y="-10%" width="120%" height="120%">
-                    <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="var(--color-primary)" floodOpacity="0.3" />
-                  </filter>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.15} vertical={false} />
                 <XAxis 
                   dataKey="date" 
                   stroke="var(--muted-foreground)" 
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
-                  dy={10}
+                  dy={5}
                 />
                 <YAxis 
                   stroke="var(--muted-foreground)" 
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
-                  dx={-10}
+                  dx={-5}
                   tickFormatter={(val) => {
                     if (val >= 1000000) return `${(val / 1000000).toFixed(1).replace(/\.0$/, '')} jt`;
                     if (val >= 1000) return `${(val / 1000).toFixed(0)} rb`;
-                    return `Rp ${val}`;
+                    return `${val}`;
                   }}
                 />
                 <Tooltip 
@@ -515,56 +657,192 @@ export default function Dashboard() {
                     fontSize: '11px',
                     fontFamily: 'monospace'
                   }}
-                  itemStyle={{ color: 'var(--color-primary)' }}
                   formatter={(value: any) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pendapatan']}
                 />
                 <Area 
                   type="monotone" 
                   dataKey="total_income" 
                   stroke="var(--color-primary)" 
-                  strokeWidth={3}
+                  strokeWidth={2}
                   fillOpacity={1} 
-                  fill="url(#purpleGradient)" 
-                  filter="url(#glow)"
+                  fill="url(#neonGradient)" 
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </CardContent>
+          </div>
         </Card>
 
-        {/* KOLOM TENGAH: LAYANAN TERLARIS (lg:col-span-3) */}
-        <div className="lg:col-span-3 h-[400px]">
-          {/* Donut Chart */}
-          <Card className="bg-card border-border rounded-2xl shadow-sm p-5 h-full flex flex-col justify-between animate-fade-in">
-            <div className="border-b border-border pb-2 flex flex-col">
-              <CardTitle className="text-xs font-semibold text-foreground uppercase tracking-wider">Layanan Terlaris</CardTitle>
-              <span className="text-[9px] text-muted-foreground font-mono mt-0.5">Proporsi transaksi per kategori</span>
+        {/* Right side: Operational status list with progress bars (Mockup style "Revenue by Location") */}
+        <Card className="lg:col-span-4 bg-card border-neutral-100 dark:border-neutral-900/60 rounded-[28px] p-5 flex flex-col h-[320px] shadow-sm justify-between">
+          <div>
+            <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block">Operasional</span>
+            <CardTitle className="text-xs font-semibold text-foreground">Distribusi Status Transaksi</CardTitle>
+          </div>
+
+          <div className="space-y-4 pt-3 flex-1 flex flex-col justify-center">
+            {/* Status Item 1: Antrian */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs font-medium">
+                <span className="text-neutral-500 dark:text-neutral-400">Antrian Baru</span>
+                <span className="text-foreground font-semibold">{countByStatus('antrian')} Nota</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
+                <div 
+                  className="h-full bg-sky-400 transition-all duration-500" 
+                  style={{ width: `${filteredTransactions.length > 0 ? (countByStatus('antrian') / filteredTransactions.length) * 100 : 0}%` }}
+                />
+              </div>
             </div>
-            
-            <div className="flex-1 flex flex-col items-center justify-center pt-2">
-              {servicePopularityData.length === 0 ? (
-                <p className="text-xs text-muted-foreground font-mono py-8">Tidak ada data layanan</p>
-              ) : (
-                <>
-                  <div className="h-48 w-full relative">
+
+            {/* Status Item 2: Diproses */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs font-medium">
+                <span className="text-neutral-500 dark:text-neutral-400">Sedang Diproses</span>
+                <span className="text-foreground font-semibold">{countByStatus('dicuci') + countByStatus('disetrika')} Nota</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-500" 
+                  style={{ width: `${filteredTransactions.length > 0 ? ((countByStatus('dicuci') + countByStatus('disetrika')) / filteredTransactions.length) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Status Item 3: Siap Diambil */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs font-medium">
+                <span className="text-neutral-500 dark:text-neutral-400">Siap Diambil</span>
+                <span className="text-foreground font-semibold">{countByStatus('siap diambil')} Nota</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-500" 
+                  style={{ width: `${filteredTransactions.length > 0 ? (countByStatus('siap diambil') / filteredTransactions.length) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Status Item 4: Diambil */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs font-medium">
+                <span className="text-neutral-500 dark:text-neutral-400">Sudah Diambil (Selesai)</span>
+                <span className="text-foreground font-semibold">{countByStatus('diambil')} Nota</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
+                <div 
+                  className="h-full bg-[#c3d4e3] dark:bg-neutral-600 transition-all duration-500" 
+                  style={{ width: `${filteredTransactions.length > 0 ? (countByStatus('diambil') / filteredTransactions.length) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* 3. ROW 3: RECENT TRANSACTIONS TABLE & SERVICES DONUT CHART */}
+      <div className="grid gap-6 lg:grid-cols-12 items-stretch">
+        
+        {/* Left side: Recent Transactions (Mockup style "Top Selling Products") */}
+        <Card className="lg:col-span-8 bg-card border-neutral-100 dark:border-neutral-900/60 rounded-[28px] p-5 flex flex-col shadow-sm min-h-[350px]">
+          <div className="pb-3 flex items-center justify-between border-b border-neutral-100 dark:border-neutral-900/40">
+            <div>
+              <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block">Nota Transaksi</span>
+              <CardTitle className="text-xs font-semibold text-foreground">Transaksi Terbaru</CardTitle>
+            </div>
+            <button 
+              onClick={() => navigate('/dashboard/transactions')} 
+              className="text-xs text-neutral-400 dark:text-neutral-500 hover:text-primary transition-colors font-semibold"
+            >
+              Lihat Semua →
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-x-auto pt-3">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-neutral-100 dark:border-neutral-900 text-neutral-400 dark:text-neutral-500 font-medium">
+                  <th className="py-2.5 px-3">Pelanggan</th>
+                  <th className="py-2.5 px-3">Kode Invoice</th>
+                  <th className="py-2.5 px-3">Layanan</th>
+                  <th className="py-2.5 px-3">Total Harga</th>
+                  <th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3">Tanggal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100/40 dark:divide-neutral-900/40">
+                {recentTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-neutral-400 font-mono">
+                      Belum ada transaksi.
+                    </td>
+                  </tr>
+                ) : (
+                  recentTransactions.map((trx) => (
+                    <tr key={trx.id} className="hover:bg-neutral-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-3 font-semibold text-foreground">
+                        {trx.customer?.user?.name || 'Pelanggan'}
+                      </td>
+                      <td className="py-3 px-3 font-mono text-neutral-500">{trx.invoice_code}</td>
+                      <td className="py-3 px-3 text-neutral-600 dark:text-neutral-400">
+                        {trx.service?.service_name || '-'}
+                      </td>
+                      <td className="py-3 px-3 font-mono font-semibold text-foreground">
+                        Rp {Number(trx.total_price).toLocaleString('id-ID')}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={`text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full border ${
+                          trx.status === 'antrian' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' :
+                          trx.status === 'dicuci' || trx.status === 'disetrika' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                          trx.status === 'siap diambil' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                          'bg-neutral-500/10 text-neutral-400 border-neutral-500/20'
+                        }`}>
+                          {trx.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-neutral-400 dark:text-neutral-500 font-mono">
+                        {trx.created_at ? new Date(trx.created_at).toLocaleDateString('id-ID') : '-'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        {/* Right side: Services Donut Chart (Mockup style "Total Sales") */}
+        <Card className="lg:col-span-4 bg-card border-neutral-100 dark:border-neutral-900/60 rounded-[28px] p-5 flex flex-col justify-between shadow-sm min-h-[350px]">
+          <div>
+            <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block">Kategori</span>
+            <CardTitle className="text-xs font-semibold text-foreground">Layanan Terlaris</CardTitle>
+          </div>
+
+          <div className="flex-1 flex flex-col items-center justify-center pt-2">
+            {servicePopularityData.length === 0 ? (
+              <p className="text-xs text-neutral-450 dark:text-neutral-500 font-mono py-8">Tidak ada data layanan</p>
+            ) : (
+              <>
+                  <div className="h-44 w-full relative">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={servicePopularityData}
                           cx="50%"
                           cy="50%"
-                          innerRadius={42}
-                          outerRadius={62}
+                          innerRadius={45}
+                          outerRadius={65}
                           paddingAngle={3}
                           dataKey="value"
                         >
-                          {servicePopularityData.map((_, index) => (
-                            <Cell 
-                              key={`cell-${index}`} 
-                              fill="var(--color-primary)" 
-                              opacity={Math.max(0.2, 1 - index * 0.12)} 
-                            />
-                          ))}
+                          {servicePopularityData.map((_, index) => {
+                            const pieColors = ['#0082c3', '#7ec143', '#00a3f5', '#a2e06c', '#006192', '#59942a'];
+                            return (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={pieColors[index % pieColors.length]} 
+                              />
+                            );
+                          })}
                         </Pie>
                         <Tooltip 
                           contentStyle={{ 
@@ -579,120 +857,40 @@ export default function Dashboard() {
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-[10px] font-mono text-muted-foreground uppercase">Total</span>
+                      <span className="text-[9px] font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">Total</span>
                       <span className="text-base font-bold text-foreground">{filteredTransactions.length}</span>
                     </div>
                   </div>
                   
-                  {/* Custom legend */}
-                  <div className="w-full mt-4 space-y-1.5 px-1 max-h-[140px] overflow-y-auto scrollbar-thin pr-1">
+                  {/* Clean Custom legend with percentage metrics */}
+                  <div className="w-full mt-4 space-y-1.5 px-2 max-h-[120px] overflow-y-auto scrollbar-thin">
                     {servicePopularityData.map((item, idx) => {
                       const pct = filteredTransactions.length > 0 
                         ? Math.round((item.value / filteredTransactions.length) * 100) 
                         : 0;
+                      const pieColors = ['#0082c3', '#7ec143', '#00a3f5', '#a2e06c', '#006192', '#59942a'];
                       return (
                         <div key={item.name} className="flex items-center justify-between text-[10px]">
-                          <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
                             <span 
-                              className="w-2 h-2 rounded-sm shrink-0" 
+                              className="w-1.5 h-1.5 rounded-sm shrink-0" 
                               style={{ 
-                                backgroundColor: 'var(--color-primary)', 
-                                opacity: Math.max(0.2, 1 - idx * 0.12) 
+                                backgroundColor: pieColors[idx % pieColors.length]
                               }} 
                             />
-                            <span className="text-muted-foreground truncate max-w-[90px]">{item.name}</span>
+                            <span className="text-neutral-455 dark:text-neutral-400 truncate max-w-[120px]">{item.name}</span>
                           </div>
                           <span className="font-mono font-semibold text-foreground shrink-0">{item.value} ({pct}%)</span>
                         </div>
                       );
                     })}
                   </div>
-                </>
-              )}
-            </div>
-          </Card>
-        </div>
-
-        {/* TRANSAKSI TERBARU: ACTIVITY FEED (lg:col-span-4) */}
-        <Card className="bg-card border-border rounded-2xl shadow-sm lg:col-span-4 p-5 flex flex-col h-[400px]">
-          <CardHeader className="p-0 pb-3 border-b border-border flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-sm font-semibold text-foreground">Transaksi Terbaru</CardTitle>
-              <p className="text-[10px] text-muted-foreground font-mono mt-0.5">Aktivitas laundry terakhir</p>
-            </div>
-            <Button 
-              variant="link" 
-              onClick={() => navigate('/dashboard/transactions')} 
-              className="text-xs text-primary hover:text-primary/80 px-0 h-auto font-mono"
-            >
-              Semua Nota →
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0 pt-5 flex-1 overflow-y-auto relative">
-            {recentTransactions.length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted-foreground font-mono">
-                Belum ada data transaksi masuk.
-              </div>
-            ) : (
-              <div className="relative pl-5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[1px] before:bg-border/60 space-y-5">
-                {recentTransactions.map((trx) => {
-                  const custName = trx.customer?.user?.name || 'Pelanggan';
-                  const dateStr = trx.created_at 
-                    ? new Date(trx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) 
-                    : '';
-                  
-                  let dotOpacity = 'opacity-100';
-                  let statusBg = 'bg-primary';
-                  if (trx.status === 'antrian') {
-                    dotOpacity = 'opacity-100';
-                    statusBg = 'bg-primary';
-                  } else if (trx.status === 'dicuci' || trx.status === 'disetrika') {
-                    dotOpacity = 'opacity-70';
-                    statusBg = 'bg-primary/70';
-                  } else {
-                    dotOpacity = 'opacity-40';
-                    statusBg = 'bg-primary/45';
-                  }
-
-                  return (
-                    <div key={trx.id} className="relative flex justify-between items-start text-xs group/item hover:bg-muted/10 p-1.5 rounded-lg -mx-1.5 transition-all">
-                      {/* Timeline Dot */}
-                      <span className={`absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full border border-card ring-2 ring-background ${statusBg} ${dotOpacity}`} />
-                      
-                      <div className="space-y-0.5 pr-3 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-semibold text-foreground truncate max-w-[110px]">{custName}</span>
-                          <span className="text-[9px] text-muted-foreground font-mono">{trx.invoice_code}</span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          Layanan: <span className="font-medium text-foreground">{trx.service?.service_name || '-'}</span>
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[8px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border ${
-                            trx.status === 'antrian' ? 'bg-primary/10 text-primary border-primary/20' :
-                            trx.status === 'dicuci' || trx.status === 'disetrika' ? 'bg-primary/10 text-primary/80 border-primary/10' :
-                            'bg-primary/5 text-primary/60 border-primary/5'
-                          }`}>
-                            {trx.status}
-                          </span>
-                          {dateStr && <span className="text-[9px] text-muted-foreground font-mono">{dateStr}</span>}
-                        </div>
-                      </div>
-                      
-                      <div className="text-right shrink-0 font-mono">
-                        <span className="font-bold text-foreground">
-                          Rp {Number(trx.total_price).toLocaleString('id-ID')}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              </>
             )}
-          </CardContent>
+          </div>
         </Card>
-
       </div>
+
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Loader2, Phone, Eye, User, Users, Mail, MapPin, Search, SlidersHorizontal } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Phone, Eye, User, Users, Mail, MapPin, Search, SlidersHorizontal, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Customers() {
@@ -287,121 +287,155 @@ export default function Customers() {
         </Table>
       </div>
 
-      {/* FORM INPUT/EDIT MODAL */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-card border-border text-foreground rounded-2xl p-6">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold text-foreground border-b border-border/60 pb-3">
-              {editId ? 'Ubah Data Pelanggan' : 'Daftarkan Akun Pelanggan Baru'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <form onSubmit={handleSubmit} className="space-y-4 py-3">
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold">Nama Lengkap</Label>
-              <Input 
-                value={formData.name} 
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                onKeyDown={(e) => { 
-                  if (e.key === 'Enter') { 
-                    e.preventDefault(); 
-                    emailRef.current?.focus(); 
-                  } 
-                }} 
-                placeholder="Misal: Sophie Laurent"
-                className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm"
-                required 
-                autoFocus 
-              />
-            </div>
+      {/* FORM INPUT/EDIT SLIDE-OVER DRAWER */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-300 animate-in fade-in"
+            onClick={() => setIsModalOpen(false)}
+          />
+          {/* Slide-over Drawer Panel */}
+          <div className="relative w-full max-w-md h-full bg-card border-l border-border shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-300 ease-in-out text-foreground">
             
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold">Alamat Email</Label>
-              <Input 
-                type="email" 
-                value={formData.email} 
-                ref={emailRef} 
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
-                onKeyDown={(e) => { 
-                  if (e.key === 'Enter') { 
-                    e.preventDefault(); 
-                    editId ? addressRef.current?.focus() : passRef.current?.focus(); 
-                  } 
-                }} 
-                placeholder="sophie@example.com"
-                className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm"
-                required 
-              />
-            </div>
-            
-            {!editId && (
-              <div className="space-y-1.5">
-                <Label className="text-muted-foreground text-xs font-semibold">Password Login Mobile</Label>
-                <Input 
-                  type="password" 
-                  placeholder="Min 6 karakter" 
-                  value={formData.password} 
-                  ref={passRef} 
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
-                  onKeyDown={(e) => { 
-                    if (e.key === 'Enter') { 
-                      e.preventDefault(); 
-                      phoneRef.current?.focus(); 
-                    } 
-                  }} 
-                  className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm"
-                  required 
-                  minLength={6} 
-                />
+            {/* Drawer Header */}
+            <div className="p-6 border-b border-border/60 flex items-center justify-between shrink-0">
+              <div className="space-y-1">
+                <h2 className="text-base font-bold text-foreground">
+                  {editId ? 'Ubah Data Pelanggan' : 'Daftarkan Akun Pelanggan Baru'}
+                </h2>
+                <p className="text-[11px] text-muted-foreground font-mono">
+                  {editId ? `Mengedit Pelanggan #${editId}` : 'Isi detail data pelanggan baru'}
+                </p>
               </div>
-            )}
-            
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold">Nomor Telepon</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  type="tel" 
-                  className="pl-9 bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm font-mono" 
-                  placeholder="08123456789" 
-                  value={formData.phone} 
-                  ref={phoneRef} 
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })} 
-                  onKeyDown={(e) => { 
-                    if (e.key === 'Enter') { 
-                      e.preventDefault(); 
-                      addressRef.current?.focus(); 
-                    } 
-                  }} 
-                  required 
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold">Alamat Rumah</Label>
-              <Input 
-                value={formData.address} 
-                ref={addressRef} 
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
-                placeholder="Jl. Merdeka Raya No. 12"
-                className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm"
-                required 
-              />
-            </div>
-            
-            <DialogFooter className="pt-4 border-t border-border/60 mt-4">
-              <Button 
-                type="submit" 
-                disabled={isSubmitting} 
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-2"
+              <button 
+                type="button" 
+                onClick={() => setIsModalOpen(false)}
+                className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
-                {isSubmitting ? <Loader2 className="animate-spin" /> : 'Simpan Pelanggan'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Drawer Form Body */}
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 no-scrollbar">
+                <div className="space-y-1.5">
+                  <Label className="text-muted-foreground text-xs font-semibold">Nama Lengkap</Label>
+                  <Input 
+                    value={formData.name} 
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                    onKeyDown={(e) => { 
+                      if (e.key === 'Enter') { 
+                        e.preventDefault(); 
+                        emailRef.current?.focus(); 
+                      } 
+                    }} 
+                    placeholder="Misal: Sophie Laurent"
+                    className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm"
+                    required 
+                    autoFocus 
+                  />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <Label className="text-muted-foreground text-xs font-semibold">Alamat Email</Label>
+                  <Input 
+                    type="email" 
+                    value={formData.email} 
+                    ref={emailRef} 
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
+                    onKeyDown={(e) => { 
+                      if (e.key === 'Enter') { 
+                        e.preventDefault(); 
+                        editId ? addressRef.current?.focus() : passRef.current?.focus(); 
+                      } 
+                    }} 
+                    placeholder="sophie@example.com"
+                    className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm"
+                    required 
+                  />
+                </div>
+                
+                {!editId && (
+                  <div className="space-y-1.5">
+                    <Label className="text-muted-foreground text-xs font-semibold">Password Login Mobile</Label>
+                    <Input 
+                      type="password" 
+                      placeholder="Min 6 karakter" 
+                      value={formData.password} 
+                      ref={passRef} 
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
+                      onKeyDown={(e) => { 
+                        if (e.key === 'Enter') { 
+                          e.preventDefault(); 
+                          phoneRef.current?.focus(); 
+                        } 
+                      }} 
+                      className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm"
+                      required 
+                      minLength={6} 
+                    />
+                  </div>
+                )}
+                
+                <div className="space-y-1.5">
+                  <Label className="text-muted-foreground text-xs font-semibold">Nomor Telepon</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      type="tel" 
+                      className="pl-9 bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm font-mono" 
+                      placeholder="08123456789" 
+                      value={formData.phone} 
+                      ref={phoneRef} 
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })} 
+                      onKeyDown={(e) => { 
+                        if (e.key === 'Enter') { 
+                          e.preventDefault(); 
+                          addressRef.current?.focus(); 
+                        } 
+                      }} 
+                      required 
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <Label className="text-muted-foreground text-xs font-semibold">Alamat Rumah</Label>
+                  <Input 
+                    value={formData.address} 
+                    ref={addressRef} 
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
+                    placeholder="Jl. Merdeka Raya No. 12"
+                    className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm"
+                    required 
+                  />
+                </div>
+              </div>
+              
+              {/* Sticky Drawer Footer */}
+              <div className="p-6 border-t border-border/60 bg-muted/20 flex gap-3 shrink-0">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="flex-1 border-border text-foreground hover:bg-muted rounded-xl"
+                  onClick={() => setIsModalOpen(false)}
+                >
+                  Batal
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting} 
+                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+                >
+                  {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : 'Simpan Pelanggan'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* VIEW DETAIL PROFIL MODAL */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
