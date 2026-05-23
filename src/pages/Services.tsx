@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, Loader2, Image as ImageIcon, Eye, WashingMachine, Search, SlidersHorizontal, CheckSquare, Square, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Image as ImageIcon, WashingMachine, Search, SlidersHorizontal, CheckSquare, Square, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STORAGE_URL = 'http://127.0.0.1:8000/storage/';
@@ -18,9 +18,15 @@ export default function Services() {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
   
   // Selection states for Bulk Actions
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -153,6 +159,11 @@ export default function Services() {
     (s.description && s.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentServices = filteredServices.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredServices.length / itemsPerPage);
+
   return (
     <div className="space-y-6">
       
@@ -242,14 +253,14 @@ export default function Services() {
             <TableBody>
               {loading ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={6} className="text-center h-32">
+                  <TableCell colSpan={5} className="text-center h-32">
                     <Loader2 className="animate-spin text-primary mx-auto h-8 w-8" />
                     <p className="text-xs text-muted-foreground font-mono mt-2">MENGAMBIL CATALOG...</p>
                   </TableCell>
                 </TableRow>
               ) : filteredServices.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={6} className="py-12">
+                  <TableCell colSpan={5} className="py-12">
                     <div className="flex flex-col items-center justify-center text-center">
                       <div className="w-16 h-16 rounded-2xl bg-muted/65 flex items-center justify-center text-muted-foreground mb-4 border border-border/60 shadow-sm">
                         <WashingMachine className="w-8 h-8 text-muted-foreground" />
@@ -267,10 +278,14 @@ export default function Services() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredServices.map((s) => (
-                  <TableRow key={s.id} className="border-b border-border/60 hover:bg-muted/40 transition-colors">
+                currentServices.map((s) => (
+                  <TableRow 
+                    key={s.id} 
+                    onClick={() => handleViewDetail(s)}
+                    className="border-b border-border/60 cursor-pointer hover:bg-muted/70 dark:hover:bg-neutral-900/50 transition-colors"
+                  >
                     <TableCell className="text-center">
-                      <button onClick={() => toggleSelect(s.id)} className="text-muted-foreground hover:text-foreground mt-1">
+                      <button onClick={(e) => { e.stopPropagation(); toggleSelect(s.id); }} className="text-muted-foreground hover:text-foreground mt-1">
                         {selectedIds.includes(s.id) ? (
                           <CheckSquare size={16} className="text-primary" />
                         ) : (
@@ -314,16 +329,8 @@ export default function Services() {
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="border-border text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8 rounded-lg" 
-                          onClick={() => handleViewDetail(s)}
-                        >
-                          <Eye size={14} />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
                           className="border-border text-primary hover:text-primary-foreground hover:bg-primary h-8 w-8 rounded-lg" 
-                          onClick={() => handleEditOpen(s)}
+                          onClick={(e) => { e.stopPropagation(); handleEditOpen(s); }}
                         >
                           <Edit size={14} />
                         </Button>
@@ -331,7 +338,7 @@ export default function Services() {
                           variant="outline" 
                           size="icon" 
                           className="border-border text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8 rounded-lg" 
-                          onClick={() => handleDelete(s.id)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }}
                         >
                           <Trash2 size={14} />
                         </Button>
@@ -362,26 +369,37 @@ export default function Services() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredServices.map((s) => (
+            {currentServices.map((s) => (
               <div 
                 key={s.id} 
                 onClick={() => handleViewDetail(s)}
-                className="bg-card dark:bg-neutral-900/40 border border-border dark:border-neutral-800/80 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-lg cursor-pointer group relative flex flex-col"
+                className="bg-card border border-border rounded-2xl overflow-hidden cursor-pointer group relative flex flex-col hover:scale-[1.01] hover:border-primary/40 dark:hover:border-cyan-500/40 hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-cyan-500/5 transition-all duration-300"
               >
                 {/* Cover Image */}
-                <div className="w-full h-40 bg-muted overflow-hidden relative">
+                <div className="w-full h-44 bg-muted overflow-hidden relative shrink-0">
                   {s.service_photo ? (
                     <img 
                       src={`${STORAGE_URL}${s.service_photo}`} 
                       alt={s.service_name} 
-                      className="w-full h-40 object-cover rounded-t-xl group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-44 object-cover rounded-t-xl group-hover:scale-105 transition-transform duration-505"
                     />
                   ) : (
-                    <div className="w-full h-40 flex flex-col items-center justify-center bg-gradient-to-br from-muted to-muted/60 text-muted-foreground">
-                      <ImageIcon size={32} strokeWidth={1.5} />
-                      <span className="text-[10px] font-mono mt-1.5 opacity-60">NO IMAGE</span>
+                    <div className="w-full h-44 flex flex-col items-center justify-center bg-gradient-to-br from-muted to-muted/60 text-muted-foreground rounded-t-xl">
+                      <WashingMachine size={36} strokeWidth={1.5} className="text-muted-foreground/60 animate-pulse" />
+                      <span className="text-[10px] font-mono mt-2 opacity-50">NO IMAGE</span>
                     </div>
                   )}
+
+                  {/* Floating Status Badge */}
+                  <div className="absolute top-3 left-3 z-10">
+                    <Badge variant="outline" className={`text-[10px] py-0.5 px-2.5 rounded-full font-bold uppercase tracking-wider border backdrop-blur-md shadow-sm ${
+                      s.is_active 
+                        ? 'bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border-emerald-500/35' 
+                        : 'bg-neutral-200/80 text-neutral-500 border-neutral-300/60 dark:bg-neutral-950/45 dark:text-neutral-300 dark:border-neutral-700/30'
+                    }`}>
+                      {s.is_active ? 'Aktif' : 'Nonaktif'}
+                    </Badge>
+                  </div>
                 </div>
 
                 {/* Hover Action Buttons */}
@@ -389,7 +407,7 @@ export default function Services() {
                   <Button 
                     variant="outline" 
                     size="icon" 
-                    className="h-8 w-8 rounded-lg border-white/20 bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 hover:text-white"
+                    className="h-8 w-8 rounded-lg border-white/20 bg-black/35 backdrop-blur-sm text-white hover:bg-black/55 hover:text-white transition-all"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleEditOpen(s);
@@ -400,7 +418,7 @@ export default function Services() {
                   <Button 
                     variant="outline" 
                     size="icon" 
-                    className="h-8 w-8 rounded-lg border-white/20 bg-black/30 backdrop-blur-sm text-white hover:bg-red-500/80 hover:text-white hover:border-red-500/40"
+                    className="h-8 w-8 rounded-lg border-white/20 bg-black/35 backdrop-blur-sm text-white hover:bg-red-500/80 hover:text-white hover:border-red-500/40 transition-all"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDelete(s.id);
@@ -411,29 +429,30 @@ export default function Services() {
                 </div>
 
                 {/* Card Body */}
-                <div className="p-5 flex-1 flex flex-col">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-sm text-foreground tracking-tight leading-tight">{s.service_name}</h3>
-                    <Badge variant="outline" className={`text-[9px] py-0 px-1.5 rounded-full font-semibold border ${
-                      s.is_active 
-                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/30' 
-                        : 'bg-neutral-500/10 text-neutral-500 border-neutral-500/20 dark:bg-neutral-900/40 dark:text-neutral-400 dark:border-neutral-800/30'
-                    }`}>
-                      {s.is_active ? 'Aktif' : 'Nonaktif'}
-                    </Badge>
+                <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <h3 className="font-extrabold text-base text-foreground tracking-tight leading-tight group-hover:text-primary transition-colors">
+                      {s.service_name}
+                    </h3>
+
+                    {/* Hide description if empty or default */}
+                    {s.description && !s.description.startsWith('Tidak ada deskripsi') && (
+                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{s.description}</p>
+                    )}
                   </div>
 
-                  {/* Hide description if empty or default */}
-                  {s.description && !s.description.startsWith('Tidak ada deskripsi') && (
-                    <p className="text-xs text-muted-foreground leading-relaxed mt-2 line-clamp-2">{s.description}</p>
-                  )}
-
-                  {/* Price */}
-                  <div className="mt-auto pt-4">
-                    <div className="border-t border-border/40 pt-3">
-                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block font-mono">TARIF</span>
-                      <span className="text-lg font-extrabold text-foreground font-mono mt-0.5 block">
-                        Rp {Number(s.price).toLocaleString('id-ID')} <span className="text-xs text-muted-foreground font-normal">/{s.unit.toLowerCase()}</span>
+                  {/* Premium Price Tag Container */}
+                  <div className="p-3 bg-muted/50 rounded-xl border border-border/50 flex justify-between items-center">
+                    <div>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block font-mono">TARIF LAYANAN</span>
+                      <span className="text-base font-black text-primary font-mono mt-0.5 block">
+                        Rp {Number(s.price).toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block font-mono">SATUAN</span>
+                      <span className="text-xs font-bold text-foreground font-mono mt-0.5 block bg-background px-2.5 py-0.5 rounded-md border border-border/60">
+                        /{s.unit}
                       </span>
                     </div>
                   </div>
@@ -442,6 +461,51 @@ export default function Services() {
             ))}
           </div>
         )
+      )}
+
+      {/* PAGINATION CONTROLS */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card border border-border rounded-2xl p-4 shadow-sm font-sans mt-4">
+          <div className="text-xs text-muted-foreground font-mono">
+            Menampilkan <span className="font-semibold text-foreground">{indexOfFirstItem + 1}</span> - <span className="font-semibold text-foreground">{Math.min(indexOfLastItem, filteredServices.length)}</span> dari <span className="font-semibold text-foreground">{filteredServices.length}</span> data
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-lg border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            >
+              <ChevronLeft size={14} />
+            </Button>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <Button
+                key={page}
+                variant={currentPage === page ? "default" : "outline"}
+                className={`h-8 w-8 text-xs rounded-lg ${
+                  currentPage === page 
+                    ? "bg-primary text-primary-foreground font-bold shadow-md shadow-primary/10" 
+                    : "border-border text-muted-foreground hover:text-foreground hover:bg-muted font-medium"
+                }`}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </Button>
+            ))}
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-lg border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            >
+              <ChevronRight size={14} />
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* FORM INPUT/EDIT SLIDE-OVER DRAWER */}
@@ -592,7 +656,7 @@ export default function Services() {
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-muted to-muted/60 text-muted-foreground">
-                    <ImageIcon size={40} strokeWidth={1.5} />
+                    <WashingMachine size={40} strokeWidth={1.5} className="animate-pulse" />
                     <span className="text-xs font-mono mt-2 opacity-60">Tidak Ada Gambar Brosur</span>
                   </div>
                 )}
@@ -607,45 +671,52 @@ export default function Services() {
               </div>
 
               {/* Service Info */}
-              <div className="p-6 space-y-5">
-                <DialogTitle className="text-lg font-bold text-foreground tracking-tight p-0 m-0">
-                  {selectedService.service_name}
-                </DialogTitle>
+              <div className="p-6 space-y-6">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] text-primary font-extrabold font-mono uppercase tracking-widest bg-primary/10 px-2.5 py-1 rounded-lg">
+                    Detail Paket Layanan
+                  </span>
+                  <DialogTitle className="text-xl font-black text-foreground tracking-tight pt-1">
+                    {selectedService.service_name}
+                  </DialogTitle>
+                </div>
                 
                 {selectedService.description && (
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider">Keterangan</p>
-                    <p className="text-sm text-muted-foreground leading-relaxed bg-muted/50 p-3 rounded-xl border border-border/50 mt-1.5">
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground font-extrabold font-mono uppercase tracking-widest">Deskripsi Layanan</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed bg-muted/40 p-4 rounded-2xl border border-border/50">
                       {selectedService.description}
                     </p>
                   </div>
                 )}
                 
-                <div className="grid grid-cols-2 gap-5 border-t border-border/60 pt-5">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider">Tarif Biaya</p>
-                    <p className="font-bold text-lg text-primary font-mono mt-1">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-muted/40 border border-border/60 p-4 rounded-2xl">
+                    <p className="text-[9px] text-muted-foreground font-bold font-mono uppercase tracking-widest">Tarif Biaya</p>
+                    <p className="font-extrabold text-lg text-primary font-mono mt-1">
                       Rp {Number(selectedService.price).toLocaleString('id-ID')}
                     </p>
-                    <p className="text-xs text-muted-foreground font-mono">per {selectedService.unit}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono">per {selectedService.unit}</p>
                   </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider">Status Katalog</p>
-                    <Badge variant="outline" className={`mt-1.5 text-[9px] uppercase font-bold tracking-wider rounded-md font-mono ${
-                      selectedService.is_active 
-                        ? 'bg-emerald-50/10 text-emerald-500 border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/30' 
-                        : 'bg-muted text-muted-foreground border-border'
-                    }`}>
-                      {selectedService.is_active ? 'Katalog Aktif' : 'Nonaktif'}
-                    </Badge>
+                  <div className="bg-muted/40 border border-border/60 p-4 rounded-2xl flex flex-col justify-between">
+                    <div>
+                      <p className="text-[9px] text-muted-foreground font-bold font-mono uppercase tracking-widest">Status Katalog</p>
+                      <Badge variant="outline" className={`mt-2 text-[10px] uppercase font-extrabold tracking-wider rounded-lg px-2.5 py-0.5 border ${
+                        selectedService.is_active 
+                          ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-400' 
+                          : 'bg-neutral-500/10 text-neutral-500 border-neutral-500/20'
+                      }`}>
+                        {selectedService.is_active ? 'AKTIF' : 'NONAKTIF'}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
 
                 <Button 
-                  className="w-full bg-muted hover:bg-muted/80 text-foreground border border-border rounded-xl mt-1" 
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-5 rounded-2xl shadow-lg shadow-primary/10 transition-all active:scale-[0.99]" 
                   onClick={() => setIsDetailOpen(false)}
                 >
-                  Tutup Brosur
+                  Tutup Brosur Layanan
                 </Button>
               </div>
             </>

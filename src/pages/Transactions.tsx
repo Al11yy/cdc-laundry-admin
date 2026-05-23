@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Plus, Trash2, Loader2, Camera, Eye, Edit, Receipt, 
-  Search, X, LayoutGrid, List, MessageSquare, MapPin 
+  Plus, Trash2, Loader2, Camera, Edit, Receipt, 
+  Search, X, LayoutGrid, List, MessageSquare, MapPin,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -23,6 +24,12 @@ export default function Transactions() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -220,6 +227,11 @@ export default function Transactions() {
     return matchesSearch && matchesStatus;
   });
 
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentTransactions = filteredTransactions.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+
   return (
     <div className="space-y-6">
       {/* HEADER PAGE */}
@@ -341,18 +353,22 @@ export default function Transactions() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTransactions.map((trx, i) => {
+                {currentTransactions.map((trx, i) => {
                   const name = trx.customer?.user?.name || 'Pelanggan';
                   const avatarColor = avatarColors[i % avatarColors.length];
 
                   return (
-                    <TableRow key={trx.id} className="border-b border-border/60 hover:bg-muted/40 transition-colors">
+                    <TableRow 
+                      key={trx.id} 
+                      onClick={() => handleViewDetail(trx)}
+                      className="border-b border-border/60 cursor-pointer hover:bg-muted/70 dark:hover:bg-neutral-900/50 transition-colors"
+                    >
                       <TableCell className="pl-6 py-4">
                         <span className="font-mono font-bold text-primary text-xs tracking-wider">{trx.invoice_code}</span>
                       </TableCell>
                       <TableCell>
                         {trx.clothes_photo ? (
-                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-border bg-muted relative group cursor-zoom-in" onClick={() => handleViewDetail(trx)}>
+                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-border bg-muted relative group">
                             <img 
                               src={`${STORAGE_URL}${trx.clothes_photo}`} 
                               alt="Kondisi" 
@@ -376,14 +392,20 @@ export default function Transactions() {
                             <button 
                               type="button"
                               className="font-semibold text-foreground text-sm hover:text-primary transition-colors cursor-pointer text-left block focus:outline-none"
-                              onClick={() => setActivePopoverId(activePopoverId === trx.id ? null : trx.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActivePopoverId(activePopoverId === trx.id ? null : trx.id);
+                              }}
                             >
                               {name}
                             </button>
                             <span className="text-[10px] text-muted-foreground font-mono block mt-0.5">{trx.service?.service_name || 'Layanan'}</span>
 
                             {activePopoverId === trx.id && (
-                              <div className="absolute left-0 bottom-full mb-2.5 z-50 w-64 bg-card border border-border p-4 rounded-xl shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 text-left">
+                              <div 
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute left-0 bottom-full mb-2.5 z-50 w-64 bg-card border border-border p-4 rounded-xl shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 text-left"
+                              >
                                 <div className="space-y-2.5">
                                   <div className="flex items-center gap-2 text-xs font-bold text-neutral-800 dark:text-neutral-200">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -422,6 +444,7 @@ export default function Transactions() {
                       </TableCell>
                       <TableCell>
                         <select 
+                          onClick={(e) => e.stopPropagation()}
                           className={`h-8 rounded-lg border px-2.5 text-xs font-semibold font-mono bg-background border-border text-foreground hover:bg-muted/80 cursor-pointer focus:outline-none transition-all duration-200 ${getStatusStyles(trx.status)}`} 
                           value={trx.status} 
                           onChange={(e) => handleStatusChange(trx.id, e.target.value)}
@@ -438,16 +461,8 @@ export default function Transactions() {
                           <Button 
                             variant="outline" 
                             size="icon" 
-                            className="border-border text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8 rounded-lg" 
-                            onClick={() => handleViewDetail(trx)}
-                          >
-                            <Eye size={14} />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
                             className="border-border text-primary hover:text-primary-foreground hover:bg-primary h-8 w-8 rounded-lg" 
-                            onClick={() => handleEditOpen(trx)}
+                            onClick={(e) => { e.stopPropagation(); handleEditOpen(trx); }}
                           >
                             <Edit size={14} />
                           </Button>
@@ -455,7 +470,7 @@ export default function Transactions() {
                             variant="outline" 
                             size="icon" 
                             className="border-border text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8 rounded-lg" 
-                            onClick={() => handleDelete(trx.id)}
+                            onClick={(e) => { e.stopPropagation(); handleDelete(trx.id); }}
                           >
                             <Trash2 size={14} />
                           </Button>
@@ -471,11 +486,15 @@ export default function Transactions() {
       ) : (
         /* CARD GRID VIEW MODE */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTransactions.map((trx, i) => {
+          {currentTransactions.map((trx, i) => {
             const name = trx.customer?.user?.name || 'Pelanggan';
             const avatarColor = avatarColors[i % avatarColors.length];
             return (
-              <div key={trx.id} className="group bg-card border border-border/80 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300 flex flex-col">
+              <div 
+                key={trx.id} 
+                onClick={() => handleViewDetail(trx)}
+                className="group bg-card border border-border/80 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300 flex flex-col cursor-pointer"
+              >
                 {/* Photo Container */}
                 <div className="h-48 w-full bg-muted relative overflow-hidden shrink-0 border-b border-border/50">
                   {trx.clothes_photo ? (
@@ -524,6 +543,7 @@ export default function Transactions() {
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] text-muted-foreground font-mono uppercase font-bold">Status:</span>
                       <select 
+                        onClick={(e) => e.stopPropagation()}
                         className={`h-8 rounded-lg border px-2 text-xs font-semibold font-mono bg-background border-border text-foreground hover:bg-muted/80 cursor-pointer focus:outline-none transition-all duration-205 ${getStatusStyles(trx.status)}`} 
                         value={trx.status} 
                         onChange={(e) => handleStatusChange(trx.id, e.target.value)}
@@ -540,22 +560,15 @@ export default function Transactions() {
                     <div className="flex items-center justify-between gap-1.5 pt-1">
                       <Button 
                         variant="outline" 
-                        className="flex-1 border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted h-9 rounded-xl gap-1.5" 
-                        onClick={() => handleViewDetail(trx)}
-                      >
-                        <Eye size={13} /> Detail
-                      </Button>
-                      <Button 
-                        variant="outline" 
                         className="flex-1 border-border text-xs text-primary hover:text-primary-foreground hover:bg-primary h-9 rounded-xl gap-1.5" 
-                        onClick={() => handleEditOpen(trx)}
+                        onClick={(e) => { e.stopPropagation(); handleEditOpen(trx); }}
                       >
                         <Edit size={13} /> Edit
                       </Button>
                       <Button 
                         variant="outline" 
                         className="border-border text-destructive hover:text-destructive-foreground hover:bg-destructive h-9 w-9 p-0 rounded-xl" 
-                        onClick={() => handleDelete(trx.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(trx.id); }}
                       >
                         <Trash2 size={13} />
                       </Button>
@@ -565,6 +578,51 @@ export default function Transactions() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* PAGINATION CONTROLS */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card border border-border rounded-2xl p-4 shadow-sm font-sans mt-4">
+          <div className="text-xs text-muted-foreground font-mono">
+            Menampilkan <span className="font-semibold text-foreground">{indexOfFirstItem + 1}</span> - <span className="font-semibold text-foreground">{Math.min(indexOfLastItem, filteredTransactions.length)}</span> dari <span className="font-semibold text-foreground">{filteredTransactions.length}</span> data
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-lg border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            >
+              <ChevronLeft size={14} />
+            </Button>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <Button
+                key={page}
+                variant={currentPage === page ? "default" : "outline"}
+                className={`h-8 w-8 text-xs rounded-lg ${
+                  currentPage === page 
+                    ? "bg-primary text-primary-foreground font-bold shadow-md shadow-primary/10" 
+                    : "border-border text-muted-foreground hover:text-foreground hover:bg-muted font-medium"
+                }`}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </Button>
+            ))}
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-lg border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            >
+              <ChevronRight size={14} />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -629,11 +687,13 @@ export default function Transactions() {
                     required
                   >
                     <option value="" className="bg-card text-muted-foreground">-- Pilih Layanan --</option>
-                    {services.map((s) => (
-                      <option key={s.id} value={s.id} className="bg-card text-foreground">
-                        {s.service_name} ({s.unit})
-                      </option>
-                    ))}
+                    {services
+                      .filter(service => service.is_active === true || service.is_active === 1 || (editId !== null && service.id.toString() === formData.service_id))
+                      .map((s) => (
+                        <option key={s.id} value={s.id} className="bg-card text-foreground">
+                          {s.service_name} ({s.unit})
+                        </option>
+                      ))}
                   </select>
                 </div>
                 

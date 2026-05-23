@@ -5,13 +5,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Loader2, Phone, Eye, User, Users, Mail, MapPin, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Phone, User, Users, Mail, MapPin, Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Customers() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -136,6 +142,11 @@ export default function Customers() {
       address.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentCustomers = filteredCustomers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+
   const avatarColors = [
     'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-400 dark:border-purple-800/40',
     'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800/40',
@@ -216,14 +227,18 @@ export default function Customers() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredCustomers.map((c, i) => {
+              currentCustomers.map((c, i) => {
                 const name = c.user?.name || 'Pelanggan';
                 const email = c.user?.email || 'N/A';
                 const avatarColor = avatarColors[i % avatarColors.length];
 
                 return (
-                  <TableRow key={c.id} className="border-b border-border/60 hover:bg-muted/40 transition-colors">
-                    <TableCell className="font-mono text-xs text-muted-foreground pl-6">{i + 1}</TableCell>
+                  <TableRow 
+                    key={c.id} 
+                    onClick={() => handleViewDetail(c)}
+                    className="border-b border-border/60 cursor-pointer hover:bg-muted/70 dark:hover:bg-neutral-900/50 transition-colors"
+                  >
+                    <TableCell className="font-mono text-xs text-muted-foreground pl-6">{indexOfFirstItem + i + 1}</TableCell>
                     <TableCell className="py-3">
                       <div className="flex items-center gap-3.5">
                         <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold font-mono ${avatarColor}`}>
@@ -242,6 +257,7 @@ export default function Customers() {
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="inline-flex items-center gap-1.5 text-primary hover:underline hover:text-primary/80 transition-colors"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <Phone size={13} className="text-muted-foreground" />
                           {c.phone}
@@ -256,16 +272,8 @@ export default function Customers() {
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="border-border text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8 rounded-lg" 
-                          onClick={() => handleViewDetail(c)}
-                        >
-                          <Eye size={14} />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
                           className="border-border text-primary hover:text-primary-foreground hover:bg-primary h-8 w-8 rounded-lg" 
-                          onClick={() => handleEditOpen(c)}
+                          onClick={(e) => { e.stopPropagation(); handleEditOpen(c); }}
                         >
                           <Edit size={14} />
                         </Button>
@@ -273,7 +281,7 @@ export default function Customers() {
                           variant="outline" 
                           size="icon" 
                           className="border-border text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8 rounded-lg" 
-                          onClick={() => handleDelete(c.id)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
                         >
                           <Trash2 size={14} />
                         </Button>
@@ -286,6 +294,51 @@ export default function Customers() {
           </TableBody>
         </Table>
       </div>
+
+      {/* PAGINATION CONTROLS */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card border border-border rounded-2xl p-4 shadow-sm font-sans mt-4">
+          <div className="text-xs text-muted-foreground font-mono">
+            Menampilkan <span className="font-semibold text-foreground">{indexOfFirstItem + 1}</span> - <span className="font-semibold text-foreground">{Math.min(indexOfLastItem, filteredCustomers.length)}</span> dari <span className="font-semibold text-foreground">{filteredCustomers.length}</span> data
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-lg border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            >
+              <ChevronLeft size={14} />
+            </Button>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <Button
+                key={page}
+                variant={currentPage === page ? "default" : "outline"}
+                className={`h-8 w-8 text-xs rounded-lg ${
+                  currentPage === page 
+                    ? "bg-primary text-primary-foreground font-bold shadow-md shadow-primary/10" 
+                    : "border-border text-muted-foreground hover:text-foreground hover:bg-muted font-medium"
+                }`}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </Button>
+            ))}
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-lg border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            >
+              <ChevronRight size={14} />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* FORM INPUT/EDIT SLIDE-OVER DRAWER */}
       {isModalOpen && (

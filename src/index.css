@@ -50,72 +50,72 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --background: oklch(0.985 0.005 242);      /* Soft sky-blue tinted background */
+  --foreground: oklch(0.20 0.02 242);        /* Deep slate text */
+  --card: oklch(1 0 0);                      /* Pure white cards for crisp contrast */
+  --card-foreground: oklch(0.20 0.02 242);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.5 0.134 242.749);
-  --primary-foreground: oklch(0.977 0.013 236.62);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.45 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.88 0 0);
-  --input: oklch(0.88 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.897 0.196 126.665);
-  --chart-2: oklch(0.768 0.233 130.85);
-  --chart-3: oklch(0.648 0.2 131.684);
-  --chart-4: oklch(0.532 0.157 131.589);
-  --chart-5: oklch(0.453 0.124 130.933);
+  --popover-foreground: oklch(0.20 0.02 242);
+  --primary: oklch(0.62 0.14 242);           /* CDC Brand Blue #2196D3 */
+  --primary-foreground: oklch(0.98 0.01 242);
+  --secondary: oklch(0.75 0.18 134);         /* CDC Brand Green #7EC839 */
+  --secondary-foreground: oklch(0.20 0.04 134);
+  --muted: oklch(0.96 0.01 242);             /* Light sky-blue gray for muted elements */
+  --muted-foreground: oklch(0.45 0.02 242);
+  --accent: oklch(0.94 0.02 242);
+  --accent-foreground: oklch(0.20 0.02 242);
+  --destructive: oklch(0.55 0.24 27);
+  --border: oklch(0.92 0.01 242);            /* Subtle cool border */
+  --input: oklch(0.92 0.01 242);
+  --ring: oklch(0.62 0.14 242);              /* Match primary for focus */
+  --chart-1: oklch(0.62 0.14 242);           /* Brand blue */
+  --chart-2: oklch(0.75 0.18 134);           /* Brand green */
+  --chart-3: oklch(0.65 0.12 195);           /* Teal accent */
+  --chart-4: oklch(0.60 0.15 280);           /* Purple accent */
+  --chart-5: oklch(0.55 0.14 30);            /* Warm accent */
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.588 0.158 241.966);
-  --sidebar-primary-foreground: oklch(0.977 0.013 236.62);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.88 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.975 0.008 242);         /* Soft-tinted sidebar */
+  --sidebar-foreground: oklch(0.20 0.02 242);
+  --sidebar-primary: oklch(0.62 0.14 242);
+  --sidebar-primary-foreground: oklch(0.98 0.01 242);
+  --sidebar-accent: oklch(0.94 0.02 242);
+  --sidebar-accent-foreground: oklch(0.20 0.02 242);
+  --sidebar-border: oklch(0.92 0.01 242);
+  --sidebar-ring: oklch(0.62 0.14 242);
 }
 
 .dark {
-  --background: oklch(0.12 0 0); /* Sleek #131313 background */
+  --background: oklch(0.12 0.005 242);       /* Deep slate-blue bg */
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.17 0 0); /* Sleek #1c1c1c card background */
+  --card: oklch(0.17 0.005 242);             /* Dark slate-blue card */
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.17 0 0);
+  --popover: oklch(0.17 0.005 242);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.65 0.12 240); /* Softer bright indigo */
+  --primary: oklch(0.68 0.14 242);           /* Bright CDC brand blue */
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.22 0 0);
+  --secondary: oklch(0.22 0.005 242);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.19 0 0);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.20 0 0);
+  --muted: oklch(0.19 0.005 242);
+  --muted-foreground: oklch(0.65 0.01 242);
+  --accent: oklch(0.20 0.005 242);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.60 0.22 25);
-  --border: oklch(0.23 0 0); /* Very clean dark gray borders */
-  --input: oklch(0.23 0 0);
-  --ring: oklch(0.50 0.10 240);
-  --chart-1: oklch(0.75 0.10 240);
-  --chart-2: oklch(0.85 0.12 200);
-  --chart-3: oklch(0.90 0.05 150);
-  --chart-4: oklch(0.65 0.15 280);
-  --chart-5: oklch(0.70 0.18 320);
-  --sidebar: oklch(0.12 0 0); /* Sleek #131313 sidebar background */
+  --border: oklch(0.23 0.005 242);           /* Clean dark slate borders */
+  --input: oklch(0.23 0.005 242);
+  --ring: oklch(0.58 0.14 242);
+  --chart-1: oklch(0.68 0.14 242);           /* Brand blue */
+  --chart-2: oklch(0.75 0.18 134);           /* Brand green */
+  --chart-3: oklch(0.70 0.10 195);           /* Teal */
+  --chart-4: oklch(0.65 0.15 280);           /* Purple */
+  --chart-5: oklch(0.70 0.18 30);            /* Warm */
+  --sidebar: oklch(0.12 0.005 242);          /* Deep sidebar */
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.65 0.12 240);
+  --sidebar-primary: oklch(0.68 0.14 242);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.17 0 0);
+  --sidebar-accent: oklch(0.17 0.005 242);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.23 0 0);
-  --sidebar-ring: oklch(0.50 0.10 240);
+  --sidebar-border: oklch(0.23 0.005 242);
+  --sidebar-ring: oklch(0.58 0.14 242);
 }
 
 @layer base {
