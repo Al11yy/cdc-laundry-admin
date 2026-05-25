@@ -28,13 +28,13 @@ export default function Queue() {
   const getStatusBadgeStyles = (status: string) => {
     switch (status.toLowerCase()) {
       case 'antrian':
-        return 'bg-amber-500/10 text-amber-505 border-amber-500/20';
+        return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
       case 'dicuci':
-        return 'bg-blue-500/10 text-blue-505 border-blue-500/20';
+        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
       case 'disetrika':
-        return 'bg-purple-500/10 text-purple-505 border-purple-500/20';
+        return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
       case 'siap diambil':
-        return 'bg-emerald-500/10 text-emerald-505 border-emerald-500/20';
+        return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
       default:
         return 'bg-neutral-500/10 text-neutral-400 border-neutral-500/20';
     }

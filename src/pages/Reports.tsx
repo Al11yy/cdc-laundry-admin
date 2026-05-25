@@ -42,7 +42,7 @@ export default function Reports() {
             <TrendingUp className="h-4 w-4 text-primary" />
           </div>
           <div className="text-2xl font-bold mt-2">Rp 8.420.000</div>
-          <p className="text-[10px] text-neutral-550 dark:text-neutral-400 mt-1">
+          <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-1">
             Margin bersih berjalan: ~65%
           </p>
         </Card>

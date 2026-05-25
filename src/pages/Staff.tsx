@@ -47,7 +47,7 @@ export default function Staff() {
                   {staff.role === 'Administrator' ? <ShieldCheck size={12} className="text-primary" /> : <Shield size={12} className="text-neutral-400" />}
                   {staff.role}
                 </p>
-                <p className="text-[10px] text-neutral-450 mt-0.5 flex items-center gap-1 font-mono">
+                <p className="text-[10px] text-neutral-400 mt-0.5 flex items-center gap-1 font-mono">
                   <Mail size={10} /> {staff.email}
                 </p>
               </div>

@@ -13,12 +13,14 @@ import Staff from '@/pages/Staff';
 import Settings from '@/pages/Settings';
 
 import { ThemeProvider } from '@/context/ThemeContext';
+import { SearchProvider } from '@/context/SearchContext';
 import { Toaster } from 'sonner';
 
 function App() {
   return (
     <ThemeProvider defaultTheme="system">
-      <Toaster 
+      <SearchProvider>
+        <Toaster 
         position="bottom-right" 
         closeButton 
         theme="system" 
@@ -52,7 +54,8 @@ function App() {
         </Route>
       </Routes>
     </Router>
-  </ThemeProvider>
+      </SearchProvider>
+   </ThemeProvider>
   );
 }
 

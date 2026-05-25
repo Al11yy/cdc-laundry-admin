@@ -474,7 +474,7 @@ export default function Dashboard() {
           {/* Card 1: Pelanggan (Soft Pastel CDC Green) */}
           <div className="bg-[#f0f9eb] border border-[#7ec143]/30 text-slate-800 dark:bg-[#7ec143]/10 dark:border-[#7ec143]/20 dark:text-[#8cd64f] rounded-[24px] p-5 flex flex-col justify-between shadow-sm relative overflow-hidden group">
             <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-slate-650 dark:text-[#8cd64f]/80 uppercase tracking-wider block">Pelanggan</span>
+              <span className="text-[11px] font-semibold text-slate-600 dark:text-[#8cd64f]/80 uppercase tracking-wider block">Pelanggan</span>
               <div className="text-3xl font-bold tracking-tight text-slate-900 dark:text-[#8cd64f]">{custCount}</div>
             </div>
             <div className="text-[10px] font-medium text-slate-600 dark:text-[#8cd64f]/80 mt-6 flex items-center gap-1">
@@ -518,7 +518,7 @@ export default function Dashboard() {
           {/* Card 4: Total Omzet (Soft Pastel CDC Blue) */}
           <div className="bg-[#e6f4fc] border border-[#0082c3]/30 text-slate-800 dark:bg-[#0082c3]/10 dark:border-[#0082c3]/20 dark:text-[#009ceb] rounded-[24px] p-5 flex flex-col justify-between shadow-sm relative overflow-hidden group">
             <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-slate-650 dark:text-[#009ceb]/80 uppercase tracking-wider block">Total Omzet</span>
+              <span className="text-[11px] font-semibold text-slate-600 dark:text-[#009ceb]/80 uppercase tracking-wider block">Total Omzet</span>
               <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-[#009ceb] truncate">
                 Rp {totalIncomeAllTime.toLocaleString('id-ID')}
               </div>
@@ -545,11 +545,11 @@ export default function Dashboard() {
             <div className="flex items-center gap-3 text-[10px]">
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded bg-[#0082c3]" />
-                <span className="text-neutral-450 dark:text-neutral-500">Total</span>
+                <span className="text-neutral-400 dark:text-neutral-500">Total</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded bg-[#7ec143]" />
-                <span className="text-neutral-450 dark:text-neutral-500">Selesai</span>
+                <span className="text-neutral-400 dark:text-neutral-500">Selesai</span>
               </div>
             </div>
           </div>
@@ -819,7 +819,7 @@ export default function Dashboard() {
 
           <div className="flex-1 flex flex-col items-center justify-center pt-2">
             {servicePopularityData.length === 0 ? (
-              <p className="text-xs text-neutral-450 dark:text-neutral-500 font-mono py-8">Tidak ada data layanan</p>
+              <p className="text-xs text-neutral-400 dark:text-neutral-500 font-mono py-8">Tidak ada data layanan</p>
             ) : (
               <>
                   <div className="h-44 w-full relative">
@@ -878,7 +878,7 @@ export default function Dashboard() {
                                 backgroundColor: pieColors[idx % pieColors.length]
                               }} 
                             />
-                            <span className="text-neutral-455 dark:text-neutral-400 truncate max-w-[120px]">{item.name}</span>
+                            <span className="text-neutral-400 dark:text-neutral-400 truncate max-w-[120px]">{item.name}</span>
                           </div>
                           <span className="font-mono font-semibold text-foreground shrink-0">{item.value} ({pct}%)</span>
                         </div>

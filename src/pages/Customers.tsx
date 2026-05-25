@@ -7,17 +7,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, Edit, Trash2, Loader2, Phone, User, Users, Mail, MapPin, Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSearch } from '@/context/SearchContext';
 
 export default function Customers() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { searchQuery, setSearchQuery } = useSearch();
+  const [addressFilter, setAddressFilter] = useState('all');
+  const [nameSort, setNameSort] = useState('default');
+  const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, addressFilter, nameSort]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -75,11 +79,17 @@ export default function Customers() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      // Buat payload bersih: jika edit & password kosong, jangan kirim password
+      const payload = { ...formData };
+      if (editId && !payload.password) {
+        delete (payload as any).password;
+      }
+
       if (editId) {
-        await apiClient.put(`/customers/${editId}`, formData);
+        await apiClient.put(`/customers/${editId}`, payload);
         toast.success('Data pelanggan berhasil diperbarui!');
       } else {
-        await apiClient.post('/customers', formData);
+        await apiClient.post('/customers', payload);
         toast.success('Akun pelanggan berhasil dibuat.');
       }
       setIsModalOpen(false);
@@ -96,7 +106,6 @@ export default function Customers() {
   const handleDelete = async (id: number) => {
     if (!window.confirm('Yakin ingin menghapus data pelanggan ini?')) return;
     
-    // OPTIMISTIC UI: Hapus dari local state langsung
     const backupCustomers = [...customers];
     setCustomers(customers.filter(c => c.id !== id));
 
@@ -104,7 +113,6 @@ export default function Customers() {
       await apiClient.delete(`/customers/${id}`);
       toast.success('Pelanggan telah berhasil dihapus.');
     } catch (error) { 
-      // Rollback jika gagal
       setCustomers(backupCustomers);
       toast.error('Gagal menghapus data!', {
         description: 'Kemungkinan pelanggan sudah terikat dengan transaksi aktif.'
@@ -112,13 +120,11 @@ export default function Customers() {
     }
   };
 
-  // Mendapatkan inisial nama untuk avatar
   const getInitials = (name: string) => {
     if (!name) return 'C';
     return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
   };
 
-  // Helper untuk formatting link WhatsApp
   const formatWhatsAppLink = (phone: string) => {
     if (!phone) return '#';
     let cleaned = phone.replace(/\D/g, '');
@@ -130,17 +136,40 @@ export default function Customers() {
     return `https://wa.me/${cleaned}`;
   };
 
-  const filteredCustomers = customers.filter(c => {
-    const name = c.user?.name || '';
-    const email = c.user?.email || '';
-    const phone = c.phone || '';
-    const address = c.address || '';
-    
-    return name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      phone.includes(searchQuery) ||
-      address.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  const filteredCustomers = customers
+    .filter(c => {
+      const name = c.user?.name || '';
+      const email = c.user?.email || '';
+      const phone = c.phone || '';
+      const address = c.address || '';
+      
+      const matchesSearch = 
+        name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        phone.includes(searchQuery) ||
+        address.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      let matchesAddress = true;
+      if (addressFilter === 'with_address') {
+        matchesAddress = !!c.address;
+      } else if (addressFilter === 'no_address') {
+        matchesAddress = !c.address;
+      } else if (addressFilter === 'no_phone') {
+        matchesAddress = !c.phone;
+      }
+      
+      return matchesSearch && matchesAddress;
+    })
+    .sort((a, b) => {
+      const nameA = a.user?.name || '';
+      const nameB = b.user?.name || '';
+      if (nameSort === 'asc') {
+        return nameA.localeCompare(nameB);
+      } else if (nameSort === 'desc') {
+        return nameB.localeCompare(nameA);
+      }
+      return 0; 
+    });
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -148,12 +177,15 @@ export default function Customers() {
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
 
   const avatarColors = [
-    'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-400 dark:border-purple-800/40',
     'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800/40',
     'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800/40',
-    'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-950/50 dark:text-orange-400 dark:border-orange-800/40',
     'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-800/40',
   ];
+
+  // Hitung data statistik riil
+  const totalCust = customers.length;
+  const withPhone = customers.filter(c => !!c.phone).length;
+  const withAddress = customers.filter(c => !!c.address).length;
 
   return (
     <div className="space-y-6">
@@ -171,20 +203,118 @@ export default function Customers() {
         </Button>
       </div>
 
-      {/* FILTER & SEARCH */}
-      <div className="flex items-center gap-3 justify-between bg-card border border-border rounded-2xl p-4 shadow-sm">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Cari nama, email, atau hp..." 
-            className="pl-9 bg-background border-border text-foreground focus-visible:ring-primary rounded-xl"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      {/* STATS CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Total Pelanggan */}
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-mono">Total Pelanggan</span>
+            <span className="text-2xl font-black tracking-tight text-foreground font-mono">{totalCust}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+            <Users size={20} />
+          </div>
         </div>
-        <Button variant="outline" className="border-border text-muted-foreground hover:bg-muted rounded-xl gap-2 text-xs">
-          <SlidersHorizontal size={14} /> Filter
-        </Button>
+
+        {/* Kontak Lengkap */}
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-mono">Kontak Telepon</span>
+            <span className="text-2xl font-black tracking-tight text-emerald-500 font-mono">{withPhone}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+            <Phone size={20} />
+          </div>
+        </div>
+
+        {/* Alamat Terdaftar */}
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-mono">Alamat Terdaftar</span>
+            <span className="text-2xl font-black tracking-tight text-blue-500 font-mono">{withAddress}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
+            <MapPin size={20} />
+          </div>
+        </div>
+      </div>
+
+      {/* FILTER & SEARCH */}
+      <div className="flex flex-col gap-4 bg-card border border-border rounded-2xl p-4 shadow-sm">
+        <div className="flex items-center gap-3 justify-between">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Cari nama, email, atau hp..." 
+              className="pl-9 bg-background border-border text-foreground focus-visible:ring-primary rounded-xl"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-xl text-xs font-semibold transition-all duration-300 transform hover:scale-[1.02] active:scale-95 cursor-pointer ${
+              showFilters 
+                ? 'bg-primary border-primary text-primary-foreground shadow-md shadow-primary/20' 
+                : 'bg-background border-border text-foreground hover:bg-muted'
+            }`}
+          >
+            <SlidersHorizontal size={14} /> 
+            <span>Filter {addressFilter !== 'all' || nameSort !== 'default' ? '(Aktif)' : ''}</span>
+          </button>
+        </div>
+
+        {/* Collapsible Filter Panel */}
+        {showFilters && (
+          <div className="space-y-4 pt-4 border-t border-border/60 animate-in fade-in slide-in-from-top-3 duration-300">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Kelengkapan Profil Filter */}
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Kelengkapan Profil</Label>
+                <select 
+                  className="flex h-10 w-full rounded-xl border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all"
+                  value={addressFilter}
+                  onChange={(e) => setAddressFilter(e.target.value)}
+                >
+                  <option value="all">Semua Pelanggan</option>
+                  <option value="with_address">Alamat Lengkap</option>
+                  <option value="no_address">Tanpa Alamat</option>
+                  <option value="no_phone">Tanpa Nomor Telepon</option>
+                </select>
+              </div>
+
+              {/* Sort Name Filter */}
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Urutkan Nama</Label>
+                <select 
+                  className="flex h-10 w-full rounded-xl border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all"
+                  value={nameSort}
+                  onChange={(e) => setNameSort(e.target.value)}
+                >
+                  <option value="default">Default (Terbaru)</option>
+                  <option value="asc">Nama Pelanggan (A-Z)</option>
+                  <option value="desc">Nama Pelanggan (Z-A)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Reset Button */}
+            {(addressFilter !== 'all' || nameSort !== 'default') && (
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => {
+                    setAddressFilter('all');
+                    setNameSort('default');
+                  }}
+                  className="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <X size={12} />
+                  <span>Reset Filter</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* CUSTOMER LIST TABLE */}
@@ -216,9 +346,11 @@ export default function Customers() {
                     </div>
                     <h3 className="text-sm font-semibold text-foreground">Tidak Ada Pelanggan</h3>
                     <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">
-                      {searchQuery ? 'Tidak ada pelanggan yang cocok dengan pencarian Anda.' : 'Belum ada data pelanggan yang terdaftar di sistem.'}
+                      {searchQuery || addressFilter !== 'all' || nameSort !== 'default' 
+                        ? 'Tidak ada pelanggan yang cocok dengan kriteria filter.' 
+                        : 'Belum ada data pelanggan yang terdaftar di sistem.'}
                     </p>
-                    {!searchQuery && (
+                    {!(searchQuery || addressFilter !== 'all' || nameSort !== 'default') && (
                       <Button onClick={handleAddOpen} variant="outline" className="mt-4 border-border text-xs rounded-xl gap-2 hover:bg-muted text-foreground">
                         <Plus size={14} /> Tambah Pelanggan
                       </Button>
@@ -401,7 +533,7 @@ export default function Customers() {
                     onKeyDown={(e) => { 
                       if (e.key === 'Enter') { 
                         e.preventDefault(); 
-                        editId ? addressRef.current?.focus() : passRef.current?.focus(); 
+                        editId ? passRef.current?.focus() : passRef.current?.focus(); 
                       } 
                     }} 
                     placeholder="sophie@example.com"
@@ -410,27 +542,27 @@ export default function Customers() {
                   />
                 </div>
                 
-                {!editId && (
-                  <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs font-semibold">Password Login Mobile</Label>
-                    <Input 
-                      type="password" 
-                      placeholder="Min 6 karakter" 
-                      value={formData.password} 
-                      ref={passRef} 
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
-                      onKeyDown={(e) => { 
-                        if (e.key === 'Enter') { 
-                          e.preventDefault(); 
-                          phoneRef.current?.focus(); 
-                        } 
-                      }} 
-                      className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm"
-                      required 
-                      minLength={6} 
-                    />
-                  </div>
-                )}
+                <div className="space-y-1.5">
+                  <Label className="text-muted-foreground text-xs font-semibold">
+                    Password Login Mobile {editId && '(Opsional)'}
+                  </Label>
+                  <Input 
+                    type="password" 
+                    placeholder={editId ? "Kosongkan jika tidak diubah" : "Min 6 karakter"} 
+                    value={formData.password} 
+                    ref={passRef} 
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
+                    onKeyDown={(e) => { 
+                      if (e.key === 'Enter') { 
+                        e.preventDefault(); 
+                        phoneRef.current?.focus(); 
+                      } 
+                    }} 
+                    className="bg-background border-border text-foreground focus-visible:ring-primary rounded-xl text-sm"
+                    required={!editId} 
+                    minLength={6} 
+                  />
+                </div>
                 
                 <div className="space-y-1.5">
                   <Label className="text-muted-foreground text-xs font-semibold">Nomor Telepon</Label>
@@ -550,7 +682,7 @@ export default function Customers() {
                   <MapPin size={16} />
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider">Alamat Laundry</p>
+                  <p className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider">Alamat Rumah</p>
                   <p className="font-medium text-foreground mt-0.5 leading-relaxed">{selectedCustomer.address}</p>
                 </div>
               </div>

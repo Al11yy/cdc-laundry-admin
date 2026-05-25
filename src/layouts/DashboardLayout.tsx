@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import apiClient from '@/api/axios';
 import { useTheme } from '@/context/ThemeContext';
+import { useSearch } from '@/context/SearchContext';
 import logoCdc from '@/assets/logo-cdc.jpg';
 import { toast } from 'sonner';
 
@@ -37,6 +38,7 @@ export default function DashboardLayout() {
   const [trxCount, setTrxCount] = useState<number | null>(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { searchQuery, setSearchQuery } = useSearch();
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebar-collapsed') === 'true';
   });
@@ -46,6 +48,7 @@ export default function DashboardLayout() {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
+  const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [liveTime, setLiveTime] = useState('');
 
@@ -70,13 +73,17 @@ export default function DashboardLayout() {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Keydown listener for quick search dialog
+  // Keydown listener for focusing global search bar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || e.key === '/') {
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
         e.preventDefault();
-        setIsSearchOpen(true);
+        const searchInput = document.getElementById('global-search-input') as HTMLInputElement;
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -295,7 +302,7 @@ export default function DashboardLayout() {
                   </span>
                 </div>
                 {!isCollapsed && (
-                  <span className="font-bold text-xs tracking-tight text-neutral-850 dark:text-neutral-200 flex items-center gap-1.5 animate-fade-in truncate max-w-[120px]">
+                  <span className="font-bold text-xs tracking-tight text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 animate-fade-in truncate max-w-[120px]">
                     {user.name || 'Admin'}
                   </span>
                 )}
@@ -325,7 +332,7 @@ export default function DashboardLayout() {
                               : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-900 hover:text-white'
                           }`}>
                             <div className="flex items-center gap-2.5 relative">
-                              <span className={`transition-colors duration-200 ${isActive ? 'text-white' : 'text-neutral-450 dark:text-neutral-500 group-hover:text-white'}`}>
+                              <span className={`transition-colors duration-200 ${isActive ? 'text-white' : 'text-neutral-400 dark:text-neutral-500 group-hover:text-white'}`}>
                                 {item.icon}
                               </span>
                               {!isCollapsed && <span className="text-xs">{item.name}</span>}
@@ -340,7 +347,7 @@ export default function DashboardLayout() {
                               <Badge variant="outline" className={`h-5 min-w-5 px-1.5 flex items-center justify-center text-[10px] rounded-full font-bold border ${
                                 isActive 
                                   ? 'bg-primary/20 text-primary border-primary/30'
-                                  : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400 border-neutral-350 dark:border-neutral-850'
+                                  : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400 border-neutral-300 dark:border-neutral-800'
                               }`}>
                                 {item.badge}
                               </Badge>
@@ -426,13 +433,13 @@ export default function DashboardLayout() {
                               : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-900 hover:text-white'
                           }`}>
                             <div className="flex items-center gap-3">
-                              <span className={isActive ? 'text-white' : 'text-neutral-450 dark:text-neutral-500'}>
+                              <span className={isActive ? 'text-white' : 'text-neutral-400 dark:text-neutral-500'}>
                                 {item.icon}
                               </span>
                               <span className="text-sm font-medium">{item.name}</span>
                             </div>
                             {item.badge !== undefined && (
-                              <Badge variant="outline" className={`h-5 min-w-5 px-1.5 flex items-center justify-center text-[10px] rounded-full font-bold border border-neutral-350 dark:border-neutral-855 bg-neutral-200 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400`}>
+                              <Badge variant="outline" className={`h-5 min-w-5 px-1.5 flex items-center justify-center text-[10px] rounded-full font-bold border border-neutral-300 dark:border-neutral-800 bg-neutral-200 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400`}>
                                 {item.badge}
                               </Badge>
                             )}
@@ -494,7 +501,7 @@ export default function DashboardLayout() {
               </button>
               <button 
                 onClick={handleBookmarkToggle}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isBookmarked ? 'text-amber-500' : 'text-neutral-405 hover:text-neutral-600 dark:hover:text-neutral-200'}`}
+                 className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isBookmarked ? 'text-amber-500' : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200'}`}
                 title="Star Page"
               >
                 <Star size={16} fill={isBookmarked ? 'currentColor' : 'none'} />
@@ -502,76 +509,98 @@ export default function DashboardLayout() {
               
               <div className="flex items-center gap-1.5 text-xs ml-2">
                 <span className="text-neutral-400 dark:text-neutral-500">{getBreadcrumbs()[0]}</span>
-                <span className="text-neutral-300 dark:text-neutral-750">/</span>
-                <span className="text-neutral-850 dark:text-neutral-200 font-medium">{getBreadcrumbs()[1]}</span>
+                <span className="text-neutral-400 dark:text-neutral-700">/</span>
+                <span className="text-neutral-800 dark:text-neutral-200 font-medium">{getBreadcrumbs()[1]}</span>
               </div>
             </div>
 
             {/* Right Section: Search & Utilities */}
             <div className="flex items-center gap-3">
-              {/* Search Bar triggers modal */}
-              <div className="relative w-40 cursor-pointer" onClick={() => setIsSearchOpen(true)}>
-                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-450 dark:text-neutral-500 pointer-events-none" />
+              {/* Global Search Bar */}
+              <div className="relative w-48 md:w-60">
+                 <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500 pointer-events-none" />
                 <input 
+                  id="global-search-input"
                   type="text" 
-                  placeholder="Search" 
-                  readOnly
-                  className="w-full h-8 pl-8 pr-7 text-xs rounded-xl bg-neutral-100/70 dark:bg-neutral-900/60 border border-transparent dark:border-neutral-800 text-foreground placeholder-neutral-400 dark:placeholder-neutral-500 cursor-pointer focus:outline-none"
+                  placeholder="Cari transaksi, layanan..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-8 pl-8 pr-7 text-xs rounded-xl bg-neutral-100/70 dark:bg-neutral-900/60 border border-transparent dark:border-neutral-800 text-foreground placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:bg-neutral-100 dark:focus:bg-neutral-900 focus:border-neutral-300 dark:focus:border-neutral-700 transition-all"
                 />
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-semibold text-neutral-450 dark:text-neutral-500 border border-neutral-200 dark:border-neutral-800 px-1.5 rounded bg-white dark:bg-neutral-855 pointer-events-none">
-                  /
-                </span>
+                {searchQuery ? (
+                  <button 
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-neutral-450 dark:text-neutral-500 hover:text-foreground px-1"
+                    title="Clear Search"
+                  >
+                    ✕
+                  </button>
+                ) : (
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-semibold text-neutral-400 dark:text-neutral-500 border border-neutral-200 dark:border-neutral-800 px-1.5 rounded bg-white dark:bg-neutral-800 pointer-events-none">
+                    /
+                  </span>
+                )}
               </div>
 
-              {/* Utility Cycle Theme Button */}
-              <button 
-                onClick={cycleTheme}
-                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                title="Cycle Theme"
-              >
-                {theme === 'light' ? <Sun size={15} /> : theme === 'dark' ? <Moon size={15} /> : <Laptop size={15} />}
-              </button>
-
-              {/* History button opens audit log */}
-              <button 
-                onClick={() => setIsHistoryOpen(true)}
-                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                title="Audit Log / History"
-              >
-                <Clock size={15} />
-              </button>
-
-              {/* Bell with red notification badge, toggles popover */}
+              {/* Theme Dropdown switcher */}
               <div className="relative">
                 <button 
-                  onClick={() => setIsNotifOpen(!isNotifOpen)}
-                  className={`p-1.5 rounded-lg transition-colors relative cursor-pointer ${isNotifOpen ? 'bg-neutral-100 dark:bg-white/5 text-foreground' : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'}`}
-                  title="Notifications"
+                  onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+                  className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center justify-center"
+                  title="Pilih Tema"
                 >
-                  <Bell size={15} />
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {theme === 'light' ? <Sun size={15} /> : theme === 'dark' ? <Moon size={15} /> : <Laptop size={15} />}
                 </button>
 
-                {/* Notifications Popover list */}
-                {isNotifOpen && (
+                {isThemeDropdownOpen && (
                   <>
-                    <div className="fixed inset-0 z-30" onClick={() => setIsNotifOpen(false)} />
-                    <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-card p-1 shadow-2xl z-40 animate-in fade-in slide-in-from-top-2 duration-150">
-                      <div className="p-3 border-b border-neutral-100 dark:border-neutral-900/60 flex justify-between items-center">
-                        <span className="text-xs font-bold text-foreground">Notifications</span>
-                        <span className="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">{getNotifications().length} Baru</span>
+                    <div className="fixed inset-0 z-30" onClick={() => setIsThemeDropdownOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-44 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-card p-1 shadow-xl z-40 animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="px-2.5 py-1.5 text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-widest border-b border-neutral-150 dark:border-neutral-800/60 mb-1">
+                        Pilih Tema
                       </div>
-                      <div className="divide-y divide-neutral-100/60 dark:divide-neutral-900/40 max-h-[250px] overflow-y-auto no-scrollbar">
-                        {getNotifications().map((n, idx) => (
-                          <div key={idx} className="p-3 hover:bg-neutral-50 dark:hover:bg-white/[0.02] transition-colors text-xs space-y-0.5">
-                            <div className="flex justify-between items-start gap-1">
-                              <span className="font-semibold text-foreground leading-tight truncate max-w-[180px]">{n.title}</span>
-                              <span className="text-[9px] text-neutral-500 dark:text-neutral-400 font-mono shrink-0">{n.time}</span>
-                            </div>
-                            <p className="text-[10px] text-neutral-600 dark:text-neutral-400 leading-normal">{n.desc}</p>
-                          </div>
-                        ))}
-                      </div>
+                      <button
+                        onClick={() => {
+                          setTheme('light');
+                          setIsThemeDropdownOpen(false);
+                        }}
+                        className={`flex items-center justify-between w-full px-2.5 py-2 text-xs text-left rounded-lg transition-colors cursor-pointer ${
+                          theme === 'light'
+                            ? 'bg-neutral-150 dark:bg-white/5 font-semibold text-foreground'
+                            : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/[0.02]'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">☀️ <span>Light Mode</span></span>
+                        {theme === 'light' && <span className="text-[10px] text-emerald-500 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTheme('dark');
+                          setIsThemeDropdownOpen(false);
+                        }}
+                        className={`flex items-center justify-between w-full px-2.5 py-2 text-xs text-left rounded-lg transition-colors cursor-pointer ${
+                          theme === 'dark'
+                            ? 'bg-neutral-150 dark:bg-white/5 font-semibold text-foreground'
+                            : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/[0.02]'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">🌙 <span>Dark Mode</span></span>
+                        {theme === 'dark' && <span className="text-[10px] text-emerald-500 font-bold">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTheme('system');
+                          setIsThemeDropdownOpen(false);
+                        }}
+                        className={`flex items-center justify-between w-full px-2.5 py-2 text-xs text-left rounded-lg transition-colors cursor-pointer ${
+                          theme === 'system'
+                            ? 'bg-neutral-150 dark:bg-white/5 font-semibold text-foreground'
+                            : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/[0.02]'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">🖥️ <span>System Default</span></span>
+                        {theme === 'system' && <span className="text-[10px] text-emerald-500 font-bold">✓</span>}
+                      </button>
                     </div>
                   </>
                 )}
@@ -586,7 +615,6 @@ export default function DashboardLayout() {
                 <LayoutDashboard size={15} />
               </button>
             </div>
-
           </div>
 
           {/* MAIN PAGE BODY SCROLL CONTAINER WITH OPTIONAL RIGHT SIDEBAR */}
@@ -646,7 +674,7 @@ export default function DashboardLayout() {
                         </div>
                         <div className="min-w-0">
                           <span className="text-foreground font-medium truncate block leading-tight">{item.name}</span>
-                          <span className="text-[9px] text-neutral-600 dark:text-neutral-450 block">{item.role}</span>
+                           <span className="text-[9px] text-neutral-600 dark:text-neutral-400 block">{item.role}</span>
                         </div>
                       </div>
                     ))}
@@ -663,7 +691,7 @@ export default function DashboardLayout() {
       {isSearchOpen && (
         <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0" onClick={() => setIsSearchOpen(false)} />
-          <div className="bg-card border border-neutral-200 dark:border-neutral-850 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl relative z-10 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-card border border-neutral-200 dark:border-neutral-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl relative z-10 animate-in fade-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-neutral-100 dark:border-neutral-900/60 flex items-center gap-3">
               <Search size={16} className="text-neutral-400" />
               <input 
@@ -672,7 +700,7 @@ export default function DashboardLayout() {
                 className="w-full bg-transparent border-none text-sm text-foreground focus:outline-none placeholder-neutral-400"
                 autoFocus
               />
-              <button onClick={() => setIsSearchOpen(false)} className="text-[9px] font-mono px-2 py-0.5 rounded border border-neutral-200 dark:border-neutral-800 text-neutral-450 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-900">
+              <button onClick={() => setIsSearchOpen(false)} className="text-[9px] font-mono px-2 py-0.5 rounded border border-neutral-200 dark:border-neutral-800 text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-900">
                 ESC
               </button>
             </div>
@@ -707,7 +735,7 @@ export default function DashboardLayout() {
       {isHistoryOpen && (
         <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0" onClick={() => setIsHistoryOpen(false)} />
-          <div className="bg-card border border-neutral-200 dark:border-neutral-850 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative z-10 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-card border border-neutral-200 dark:border-neutral-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative z-10 animate-in fade-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-neutral-100 dark:border-neutral-900/60 flex justify-between items-center">
               <span className="text-xs font-bold text-foreground uppercase tracking-wider">Aktivitas Audit Kasir</span>
               <button onClick={() => setIsHistoryOpen(false)} className="text-neutral-400 hover:text-foreground">
@@ -724,7 +752,7 @@ export default function DashboardLayout() {
                 <div key={idx} className="flex gap-3 text-xs text-left">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
                   <div className="space-y-0.5">
-                    <p className="text-neutral-750 dark:text-neutral-200 font-medium">{log.action}</p>
+                    <p className="text-neutral-700 dark:text-neutral-200 font-medium">{log.action}</p>
                     <div className="flex gap-2 text-[9px] text-neutral-400 font-mono">
                       <span>Oleh: {log.user}</span>
                       <span>•</span>

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, Loader2, Image as ImageIcon, WashingMachine, Search, SlidersHorizontal, CheckSquare, Square, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSearch } from '@/context/SearchContext';
 
 const STORAGE_URL = 'http://127.0.0.1:8000/storage/';
 
@@ -17,7 +18,7 @@ export default function Services() {
   const [services, setServices] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { searchQuery, setSearchQuery } = useSearch();
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
   
@@ -318,7 +319,7 @@ export default function Services() {
                     <TableCell>
                       <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider rounded-md font-mono ${
                         s.is_active 
-                          ? 'bg-emerald-55/10 text-emerald-500 border-emerald-55/20 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/30' 
+                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/30' 
                           : 'bg-muted text-muted-foreground border-border'
                       }`}>
                         {s.is_active ? 'Aktif' : 'Nonaktif'}
@@ -381,7 +382,7 @@ export default function Services() {
                     <img 
                       src={`${STORAGE_URL}${s.service_photo}`} 
                       alt={s.service_name} 
-                      className="w-full h-44 object-cover rounded-t-xl group-hover:scale-105 transition-transform duration-505"
+                      className="w-full h-44 object-cover rounded-t-xl group-hover:scale-105 transition-transform duration-500"
                     />
                   ) : (
                     <div className="w-full h-44 flex flex-col items-center justify-center bg-gradient-to-br from-muted to-muted/60 text-muted-foreground rounded-t-xl">
