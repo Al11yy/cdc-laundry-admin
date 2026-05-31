@@ -4,24 +4,34 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Loader2, Phone, User, Users, Mail, MapPin, Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Plus, Edit, Trash2, Loader2, Phone, Users, Mail, MapPin, Search, SlidersHorizontal, X, ChevronLeft, ChevronRight, Activity, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSearch } from '@/context/SearchContext';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 
 export default function Customers() {
   const [customers, setCustomers] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const { searchQuery, setSearchQuery } = useSearch();
-  const [addressFilter, setAddressFilter] = useState('all');
+  const [activityFilter, setActivityFilter] = useState('all');
   const [nameSort, setNameSort] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, addressFilter, nameSort]);
+  }, [searchQuery, activityFilter, nameSort]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -39,8 +49,12 @@ export default function Customers() {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/customers'); 
-      setCustomers(response.data?.data || response.data || []);
+      const [custRes, trxRes] = await Promise.all([
+        apiClient.get('/customers'),
+        apiClient.get('/transactions')
+      ]);
+      setCustomers(custRes.data?.data || custRes.data || []);
+      setTransactions(trxRes.data?.data || trxRes.data || []);
     } catch (error) { 
       console.error(error); 
     } finally { 
@@ -108,6 +122,7 @@ export default function Customers() {
     
     const backupCustomers = [...customers];
     setCustomers(customers.filter(c => c.id !== id));
+    setSelectedIds(prev => prev.filter(item => item !== id));
 
     try {
       await apiClient.delete(`/customers/${id}`);
@@ -117,6 +132,45 @@ export default function Customers() {
       toast.error('Gagal menghapus data!', {
         description: 'Kemungkinan pelanggan sudah terikat dengan transaksi aktif.'
       }); 
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const currentIds = currentCustomers.map(c => c.id);
+    const allSelected = currentIds.every(id => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds(prev => prev.filter(id => !currentIds.includes(id)));
+    } else {
+      setSelectedIds(prev => {
+        const newSelected = [...prev];
+        currentIds.forEach(id => {
+          if (!newSelected.includes(id)) newSelected.push(id);
+        });
+        return newSelected;
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Yakin ingin menghapus ${selectedIds.length} pelanggan terpilih?`)) return;
+    setLoading(true);
+    try {
+      await Promise.all(selectedIds.map(id => apiClient.delete(`/customers/${id}`)));
+      toast.success('Pelanggan terpilih berhasil dihapus.');
+      setSelectedIds([]);
+      fetchCustomers();
+    } catch (error) {
+      toast.error('Gagal menghapus beberapa pelanggan! Kemungkinan sudah terikat dengan transaksi aktif.');
+      fetchCustomers();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -149,16 +203,32 @@ export default function Customers() {
         phone.includes(searchQuery) ||
         address.toLowerCase().includes(searchQuery.toLowerCase());
       
-      let matchesAddress = true;
-      if (addressFilter === 'with_address') {
-        matchesAddress = !!c.address;
-      } else if (addressFilter === 'no_address') {
-        matchesAddress = !c.address;
-      } else if (addressFilter === 'no_phone') {
-        matchesAddress = !c.phone;
+      // Calculate activity/loyalty metrics for this customer
+      const customerTrxs = transactions.filter(t => Number(t.customer_id) === Number(c.id));
+      const hasActive = customerTrxs.some(t => t.status.toLowerCase() !== 'diambil');
+      const orderCount = customerTrxs.length;
+      const totalWeight = customerTrxs.reduce((sum, t) => sum + Number(t.weight || 0), 0);
+      
+      let latestDate: Date | null = null;
+      if (customerTrxs.length > 0) {
+        const dates = customerTrxs.map(t => new Date(t.created_at).getTime());
+        latestDate = new Date(Math.max(...dates));
+      }
+      const now = new Date();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(now.getDate() - 30);
+      const isPassive = !latestDate || latestDate < thirtyDaysAgo;
+
+      let matchesActivity = true;
+      if (activityFilter === 'active') {
+        matchesActivity = hasActive;
+      } else if (activityFilter === 'loyal') {
+        matchesActivity = orderCount >= 5 || totalWeight > 10;
+      } else if (activityFilter === 'passive') {
+        matchesActivity = isPassive;
       }
       
-      return matchesSearch && matchesAddress;
+      return matchesSearch && matchesActivity;
     })
     .sort((a, b) => {
       const nameA = a.user?.name || '';
@@ -182,10 +252,20 @@ export default function Customers() {
     'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-800/40',
   ];
 
-  // Hitung data statistik riil
+  // Hitung data statistik riil berdasarkan transaksi
   const totalCust = customers.length;
-  const withPhone = customers.filter(c => !!c.phone).length;
-  const withAddress = customers.filter(c => !!c.address).length;
+  
+  const activeCust = customers.filter(c => {
+    const custTrxs = transactions.filter(t => Number(t.customer_id) === Number(c.id));
+    return custTrxs.some(t => t.status.toLowerCase() !== 'diambil');
+  }).length;
+  
+  const loyalCust = customers.filter(c => {
+    const custTrxs = transactions.filter(t => Number(t.customer_id) === Number(c.id));
+    const orderCount = custTrxs.length;
+    const totalWeight = custTrxs.reduce((sum, t) => sum + Number(t.weight || 0), 0);
+    return orderCount >= 5 || totalWeight > 10;
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -216,25 +296,25 @@ export default function Customers() {
           </div>
         </div>
 
-        {/* Kontak Lengkap */}
+        {/* Pelanggan Aktif */}
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-mono">Kontak Telepon</span>
-            <span className="text-2xl font-black tracking-tight text-emerald-500 font-mono">{withPhone}</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-mono">Pelanggan Aktif</span>
+            <span className="text-2xl font-black tracking-tight text-emerald-500 font-mono">{activeCust}</span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
-            <Phone size={20} />
+            <Activity size={20} />
           </div>
         </div>
 
-        {/* Alamat Terdaftar */}
+        {/* Pelanggan Loyal */}
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-mono">Alamat Terdaftar</span>
-            <span className="text-2xl font-black tracking-tight text-blue-500 font-mono">{withAddress}</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-mono">Pelanggan Loyal</span>
+            <span className="text-2xl font-black tracking-tight text-amber-500 font-mono">{loyalCust}</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
-            <MapPin size={20} />
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+            <Trophy size={20} />
           </div>
         </div>
       </div>
@@ -260,7 +340,7 @@ export default function Customers() {
             }`}
           >
             <SlidersHorizontal size={14} /> 
-            <span>Filter {addressFilter !== 'all' || nameSort !== 'default' ? '(Aktif)' : ''}</span>
+            <span>Filter {activityFilter !== 'all' || nameSort !== 'default' ? '(Aktif)' : ''}</span>
           </button>
         </div>
 
@@ -268,42 +348,44 @@ export default function Customers() {
         {showFilters && (
           <div className="space-y-4 pt-4 border-t border-border/60 animate-in fade-in slide-in-from-top-3 duration-300">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Kelengkapan Profil Filter */}
+              {/* Status Aktivitas Filter */}
               <div className="space-y-1.5">
-                <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Kelengkapan Profil</Label>
-                <select 
-                  className="flex h-10 w-full rounded-xl border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all"
-                  value={addressFilter}
-                  onChange={(e) => setAddressFilter(e.target.value)}
-                >
-                  <option value="all">Semua Pelanggan</option>
-                  <option value="with_address">Alamat Lengkap</option>
-                  <option value="no_address">Tanpa Alamat</option>
-                  <option value="no_phone">Tanpa Nomor Telepon</option>
-                </select>
+                <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Status Aktivitas</Label>
+                <Select value={activityFilter} onValueChange={setActivityFilter}>
+                  <SelectTrigger className="w-full h-10 rounded-xl border border-border bg-background text-xs text-foreground focus:ring-1 focus:ring-primary cursor-pointer transition-all">
+                    <SelectValue placeholder="Semua Pelanggan" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="bg-card border-border text-foreground">
+                    <SelectItem value="all" className="cursor-pointer">Semua Pelanggan</SelectItem>
+                    <SelectItem value="active" className="cursor-pointer">Sedang Mencuci</SelectItem>
+                    <SelectItem value="loyal" className="cursor-pointer">Pelanggan Loyal</SelectItem>
+                    <SelectItem value="passive" className="cursor-pointer">Pelanggan Pasif</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Sort Name Filter */}
               <div className="space-y-1.5">
                 <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Urutkan Nama</Label>
-                <select 
-                  className="flex h-10 w-full rounded-xl border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all"
-                  value={nameSort}
-                  onChange={(e) => setNameSort(e.target.value)}
-                >
-                  <option value="default">Default (Terbaru)</option>
-                  <option value="asc">Nama Pelanggan (A-Z)</option>
-                  <option value="desc">Nama Pelanggan (Z-A)</option>
-                </select>
+                <Select value={nameSort} onValueChange={setNameSort}>
+                  <SelectTrigger className="w-full h-10 rounded-xl border border-border bg-background text-xs text-foreground focus:ring-1 focus:ring-primary cursor-pointer transition-all">
+                    <SelectValue placeholder="Default (Terbaru)" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="bg-card border-border text-foreground">
+                    <SelectItem value="default" className="cursor-pointer">Default (Terbaru)</SelectItem>
+                    <SelectItem value="asc" className="cursor-pointer">Nama Pelanggan (A-Z)</SelectItem>
+                    <SelectItem value="desc" className="cursor-pointer">Nama Pelanggan (Z-A)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             {/* Reset Button */}
-            {(addressFilter !== 'all' || nameSort !== 'default') && (
+            {(activityFilter !== 'all' || nameSort !== 'default') && (
               <div className="flex justify-end pt-2">
                 <button
                   onClick={() => {
-                    setAddressFilter('all');
+                    setActivityFilter('all');
                     setNameSort('default');
                   }}
                   className="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors flex items-center gap-1 cursor-pointer"
@@ -317,12 +399,52 @@ export default function Customers() {
         )}
       </div>
 
+      {/* BULK ACTIONS BAR */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-primary/5 border border-primary/20 rounded-2xl p-4 animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-primary font-mono bg-primary/10 px-2.5 py-1 rounded-lg">
+              {selectedIds.length} Pelanggan Terpilih
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              size="sm" 
+              variant="destructive" 
+              onClick={handleBulkDelete}
+              className="h-9 text-xs rounded-xl font-medium cursor-pointer gap-1.5"
+            >
+              <Trash2 size={14} />
+              <span>Hapus Terpilih</span>
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedIds([])}
+              className="h-9 text-xs text-muted-foreground hover:text-foreground rounded-xl cursor-pointer"
+            >
+              Batal
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* CUSTOMER LIST TABLE */}
       <div className="border border-border rounded-2xl bg-card overflow-hidden shadow-sm">
         <Table>
           <TableHeader className="bg-muted/40 border-b border-border">
             <TableRow className="border-none hover:bg-transparent">
-              <TableHead className="w-16 text-muted-foreground font-mono text-xs pl-6">No</TableHead>
+              <TableHead className="w-12 pl-6">
+                <Checkbox 
+                  checked={
+                    currentCustomers.length > 0 && 
+                    currentCustomers.every(c => selectedIds.includes(c.id))
+                  }
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Pilih semua pelanggan"
+                />
+              </TableHead>
+              <TableHead className="w-16 text-muted-foreground font-mono text-xs">No</TableHead>
               <TableHead className="text-muted-foreground font-mono text-xs">Profil Pelanggan</TableHead>
               <TableHead className="text-muted-foreground font-mono text-xs">Telepon</TableHead>
               <TableHead className="text-muted-foreground font-mono text-xs">Alamat</TableHead>
@@ -332,25 +454,25 @@ export default function Customers() {
           <TableBody>
             {loading ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={5} className="text-center h-32">
+                <TableCell colSpan={6} className="text-center h-32">
                   <Loader2 className="animate-spin text-primary mx-auto h-8 w-8" />
                   <p className="text-xs text-muted-foreground font-mono mt-2">MENGAMBIL PELANGGAN...</p>
                 </TableCell>
               </TableRow>
             ) : filteredCustomers.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={5} className="py-12">
+                <TableCell colSpan={6} className="py-12">
                   <div className="flex flex-col items-center justify-center text-center">
                     <div className="w-16 h-16 rounded-2xl bg-muted/65 flex items-center justify-center text-muted-foreground mb-4 border border-border/60 shadow-sm">
                       <Users className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <h3 className="text-sm font-semibold text-foreground">Tidak Ada Pelanggan</h3>
                     <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">
-                      {searchQuery || addressFilter !== 'all' || nameSort !== 'default' 
+                      {searchQuery || activityFilter !== 'all' || nameSort !== 'default' 
                         ? 'Tidak ada pelanggan yang cocok dengan kriteria filter.' 
                         : 'Belum ada data pelanggan yang terdaftar di sistem.'}
                     </p>
-                    {!(searchQuery || addressFilter !== 'all' || nameSort !== 'default') && (
+                    {!(searchQuery || activityFilter !== 'all' || nameSort !== 'default') && (
                       <Button onClick={handleAddOpen} variant="outline" className="mt-4 border-border text-xs rounded-xl gap-2 hover:bg-muted text-foreground">
                         <Plus size={14} /> Tambah Pelanggan
                       </Button>
@@ -370,7 +492,14 @@ export default function Customers() {
                     onClick={() => handleViewDetail(c)}
                     className="border-b border-border/60 cursor-pointer hover:bg-muted/70 dark:hover:bg-neutral-900/50 transition-colors"
                   >
-                    <TableCell className="font-mono text-xs text-muted-foreground pl-6">{indexOfFirstItem + i + 1}</TableCell>
+                    <TableCell className="pl-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox 
+                        checked={selectedIds.includes(c.id)}
+                        onCheckedChange={() => toggleSelect(c.id)}
+                        aria-label={`Pilih pelanggan ${name}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{indexOfFirstItem + i + 1}</TableCell>
                     <TableCell className="py-3">
                       <div className="flex items-center gap-3.5">
                         <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold font-mono ${avatarColor}`}>
@@ -624,76 +753,104 @@ export default function Customers() {
 
       {/* VIEW DETAIL PROFIL MODAL */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="sm:max-w-[400px] bg-card border-border text-foreground rounded-2xl p-6">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground border-b border-border/60 pb-3">
-              <User className="text-primary"/> Profil Lengkap Pelanggan
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedCustomer && (
-            <div className="space-y-4 py-3 text-sm my-2 border-b border-border/60">
-              <div className="flex items-start gap-3.5">
-                <div className="p-2 bg-muted border border-border rounded-xl text-primary shrink-0">
-                  <User size={16} />
+        <DialogContent className="sm:max-w-[420px] bg-card border border-border text-foreground rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+          {selectedCustomer && (() => {
+            const customerTrxs = transactions.filter(t => Number(t.customer_id) === Number(selectedCustomer.id));
+            const customerTrxsCount = customerTrxs.length;
+            const customerWeightCount = customerTrxs.reduce((sum, t) => sum + Number(t.weight || 0), 0);
+            return (
+              <div className="space-y-6">
+                {/* Header with Avatar */}
+                <div className="flex flex-col items-center text-center space-y-3 pb-4 border-b border-border/50">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center text-primary font-black text-xl font-mono shadow-inner">
+                    {getInitials(selectedCustomer.user?.name || '')}
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-foreground leading-tight">{selectedCustomer.user?.name}</h3>
+                    <p className="text-[10px] text-muted-foreground font-mono mt-1">CUSTOMER ID: #CST-{selectedCustomer.id}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider">Nama Lengkap</p>
-                  <p className="font-semibold text-foreground text-sm mt-0.5">{selectedCustomer.user?.name}</p>
-                </div>
-              </div>
 
-              <div className="flex items-start gap-3.5">
-                <div className="p-2 bg-muted border border-border rounded-xl text-muted-foreground shrink-0">
-                  <Mail size={16} />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider">Email Sistem</p>
-                  <p className="font-medium text-foreground mt-0.5">{selectedCustomer.user?.email}</p>
-                </div>
-              </div>
+                {/* Contact / Profile Info List */}
+                <div className="space-y-4 text-xs">
+                  {/* Email */}
+                  <div className="flex items-center justify-between p-3.5 bg-muted/30 border border-border/60 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-background border border-border rounded-xl text-muted-foreground">
+                        <Mail size={14} />
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-muted-foreground font-bold font-mono uppercase tracking-wider block">Email Sistem</span>
+                        <span className="font-medium text-foreground mt-0.5 block truncate max-w-[180px]">{selectedCustomer.user?.email || '-'}</span>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="flex items-start gap-3.5">
-                <div className="p-2 bg-muted border border-border rounded-xl text-muted-foreground shrink-0">
-                  <Phone size={16} />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider">Nomor Telepon</p>
-                  <p className="font-medium text-foreground mt-0.5 font-mono">
-                    {selectedCustomer.phone ? (
-                      <a 
-                        href={formatWhatsAppLink(selectedCustomer.phone)} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="inline-flex items-center gap-1.5 text-primary hover:underline hover:text-primary/80 transition-colors"
-                      >
-                        <Phone size={13} className="text-muted-foreground" />
-                        {selectedCustomer.phone}
-                      </a>
-                    ) : (
-                      '-'
-                    )}
-                  </p>
-                </div>
-              </div>
+                  {/* WhatsApp */}
+                  <div className="flex items-center justify-between p-3.5 bg-muted/30 border border-border/60 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-background border border-border rounded-xl text-muted-foreground">
+                        <Phone size={14} />
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-muted-foreground font-bold font-mono uppercase tracking-wider block">WhatsApp / HP</span>
+                        {selectedCustomer.phone ? (
+                          <a 
+                            href={formatWhatsAppLink(selectedCustomer.phone)} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="font-semibold text-primary hover:underline mt-0.5 block font-mono"
+                          >
+                            {selectedCustomer.phone} ↗
+                          </a>
+                        ) : (
+                          <span className="font-medium text-muted-foreground mt-0.5 block">-</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="flex items-start gap-3.5">
-                <div className="p-2 bg-muted border border-border rounded-xl text-muted-foreground shrink-0">
-                  <MapPin size={16} />
+                  {/* Address */}
+                  <div className="p-3.5 bg-muted/30 border border-border/60 rounded-2xl space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-background border border-border rounded-xl text-muted-foreground">
+                        <MapPin size={14} />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground font-bold font-mono uppercase tracking-wider">Alamat Rumah</span>
+                    </div>
+                    <p className="text-foreground leading-relaxed pl-1 text-xs whitespace-pre-wrap">
+                      {selectedCustomer.address || 'Tidak ada info alamat.'}
+                    </p>
+                  </div>
+
+                  {/* Activity Summary Stats */}
+                  <div className="p-3.5 bg-muted/30 border border-border/60 rounded-2xl space-y-3">
+                    <span className="text-[9px] text-muted-foreground font-bold font-mono uppercase tracking-wider block">Ringkasan Aktivitas Toko</span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-background border border-border/60 p-2.5 rounded-xl text-center shadow-sm">
+                        <span className="text-[9px] text-muted-foreground font-mono block">Total Order</span>
+                        <span className="font-extrabold text-xs text-primary font-mono mt-0.5 block">{customerTrxsCount} Kali</span>
+                      </div>
+                      <div className="bg-background border border-border/60 p-2.5 rounded-xl text-center shadow-sm">
+                        <span className="text-[9px] text-muted-foreground font-mono block">Total Berat</span>
+                        <span className="font-extrabold text-xs text-emerald-500 font-mono mt-0.5 block">{customerWeightCount} Kg</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-bold font-mono uppercase tracking-wider">Alamat Rumah</p>
-                  <p className="font-medium text-foreground mt-0.5 leading-relaxed">{selectedCustomer.address}</p>
+
+                {/* Modal Actions */}
+                <div className="pt-2">
+                  <Button 
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-5 rounded-2xl shadow-md transition-all active:scale-[0.99] text-xs" 
+                    onClick={() => setIsDetailOpen(false)}
+                  >
+                    Tutup Profil Pelanggan
+                  </Button>
                 </div>
               </div>
-            </div>
-          )}
-          
-          <DialogFooter className="pt-2">
-            <Button className="w-full bg-muted hover:bg-muted/80 text-foreground border border-border rounded-xl" onClick={() => setIsDetailOpen(false)}>
-              Tutup Profil
-            </Button>
-          </DialogFooter>
+            );
+          })()}
         </DialogContent>
       </Dialog>
       

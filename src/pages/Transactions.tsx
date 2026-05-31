@@ -9,11 +9,28 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Plus, Trash2, Loader2, Edit, Receipt, 
   Search, X, LayoutGrid, List, MessageSquare, MapPin,
-  ChevronLeft, ChevronRight, CreditCard, DollarSign, AlertCircle,
-  SlidersHorizontal
+  ChevronLeft, ChevronRight, CreditCard, DollarSign,
+  SlidersHorizontal, Calendar as CalendarIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSearch } from '@/context/SearchContext';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 const STORAGE_URL = 'http://127.0.0.1:8000/storage/';
 
@@ -27,14 +44,16 @@ export default function Transactions() {
   const { searchQuery, setSearchQuery } = useSearch();
   const [statusFilter, setStatusFilter] = useState('all');
   const [proofFilter, setProofFilter] = useState('all');
-  const [weightSort, setWeightSort] = useState('default');
+  const [sortBy, setSortBy] = useState('default');
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, proofFilter, weightSort]);
+  }, [searchQuery, statusFilter, proofFilter, sortBy, dateFilter]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -137,7 +156,7 @@ export default function Transactions() {
       await apiClient.patch(`/transactions/${id}/status`, { status: newStatus });
       toast.success('Status transaksi berhasil diperbarui.');
       if (selectedTrx && selectedTrx.id === id) {
-        setSelectedTrx(prev => ({ ...prev, status: newStatus }));
+        setSelectedTrx((prev: any) => ({ ...prev, status: newStatus }));
       }
     } catch (error) {
       setTransactions(prevTransactions);
@@ -194,6 +213,7 @@ export default function Transactions() {
     if (!window.confirm('Yakin ingin menghapus transaksi ini?')) return;
     const prevTransactions = [...transactions];
     setTransactions(transactions.filter(t => t.id !== id));
+    setSelectedIds(prev => prev.filter(item => item !== id));
     
     try { 
       await apiClient.delete(`/transactions/${id}`);
@@ -201,6 +221,65 @@ export default function Transactions() {
     } catch (error) { 
       setTransactions(prevTransactions);
       toast.error('Gagal menghapus transaksi!'); 
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    const numId = Number(id);
+    setSelectedIds(prev => 
+      prev.includes(numId) ? prev.filter(item => item !== numId) : [...prev, numId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const currentIds = currentTransactions.map(t => Number(t.id));
+    const allSelected = currentIds.every(id => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds(prev => prev.filter(id => !currentIds.includes(id)));
+    } else {
+      setSelectedIds(prev => {
+        const newSelected = [...prev];
+        currentIds.forEach(id => {
+          if (!newSelected.includes(id)) newSelected.push(id);
+        });
+        return newSelected;
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Yakin ingin menghapus ${selectedIds.length} transaksi terpilih?`)) return;
+    setLoading(true);
+    try {
+      await Promise.all(selectedIds.map(id => apiClient.delete(`/transactions/${id}`)));
+      toast.success('Transaksi terpilih berhasil dihapus.');
+      setSelectedIds([]);
+      fetchData();
+    } catch (error) {
+      console.error('Error in bulk delete:', error);
+      toast.error('Gagal menghapus beberapa transaksi!');
+      setSelectedIds([]);
+      fetchData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkStatusUpdate = async (newStatus: string) => {
+    if (selectedIds.length === 0) return;
+    setLoading(true);
+    try {
+      await Promise.all(
+        selectedIds.map(id => apiClient.patch(`/transactions/${id}/status`, { status: newStatus }))
+      );
+      toast.success('Status transaksi terpilih berhasil diperbarui.');
+      setSelectedIds([]);
+      fetchData();
+    } catch (error) {
+      toast.error('Gagal memperbarui status transaksi terpilih!');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -270,13 +349,29 @@ export default function Transactions() {
         matchesProof = trx.payment_method === 'cash';
       }
       
-      return matchesSearch && matchesStatus && matchesProof;
+      let matchesDate = true;
+      if (dateFilter) {
+        if (!trx.created_at) {
+          matchesDate = false;
+        } else {
+          const trxDate = new Date(trx.created_at);
+          matchesDate = trxDate.getDate() === dateFilter.getDate() &&
+                        trxDate.getMonth() === dateFilter.getMonth() &&
+                        trxDate.getFullYear() === dateFilter.getFullYear();
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesProof && matchesDate;
     })
     .sort((a, b) => {
-      if (weightSort === 'asc') {
+      if (sortBy === 'weight_asc') {
         return Number(a.weight) - Number(b.weight);
-      } else if (weightSort === 'desc') {
+      } else if (sortBy === 'weight_desc') {
         return Number(b.weight) - Number(a.weight);
+      } else if (sortBy === 'price_asc') {
+        return Number(a.total_price) - Number(b.total_price);
+      } else if (sortBy === 'price_desc') {
+        return Number(b.total_price) - Number(a.total_price);
       }
       return 0;
     });
@@ -326,7 +421,7 @@ export default function Transactions() {
               }`}
             >
               <SlidersHorizontal size={14} />
-              <span>Filter {statusFilter !== 'all' || proofFilter !== 'all' || weightSort !== 'default' ? '(Aktif)' : ''}</span>
+              <span>Filter {statusFilter !== 'all' || proofFilter !== 'all' || sortBy !== 'default' ? '(Aktif)' : ''}</span>
             </button>
 
             {/* View Toggle Switcher */}
@@ -358,34 +453,71 @@ export default function Transactions() {
         {/* Collapsible Filter Panel */}
         {showFilters && (
           <div className="space-y-4 pt-4 border-t border-border/60 animate-in fade-in slide-in-from-top-3 duration-300">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Filter Tanggal */}
+              <div className="space-y-1.5 flex flex-col">
+                <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Filter Tanggal</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full h-10 justify-start text-left font-normal rounded-xl border border-border bg-background text-xs text-foreground focus:ring-1 focus:ring-primary cursor-pointer transition-all",
+                        !dateFilter && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-3.5 w-3.5 text-primary shrink-0" />
+                      {dateFilter ? (
+                        dateFilter.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+                      ) : (
+                        <span>Pilih Tanggal</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-card border border-border shadow-xl z-50 rounded-xl" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateFilter}
+                      onSelect={setDateFilter}
+                      captionLayout="dropdown"
+                      startMonth={new Date(2020, 0)}
+                      endMonth={new Date(2035, 11)}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
               {/* Bukti Bayar Filter */}
               <div className="space-y-1.5">
                 <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Filter Bukti Bayar</Label>
-                <select 
-                  className="flex h-10 w-full rounded-xl border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all"
-                  value={proofFilter}
-                  onChange={(e) => setProofFilter(e.target.value)}
-                >
-                  <option value="all">Semua Bukti</option>
-                  <option value="uploaded">Sudah Upload Bukti Transfer</option>
-                  <option value="not_uploaded">Belum Upload Bukti Transfer</option>
-                  <option value="cash">Cash (Tunai)</option>
-                </select>
+                <Select value={proofFilter} onValueChange={setProofFilter}>
+                  <SelectTrigger className="w-full h-10 rounded-xl border border-border bg-background text-xs text-foreground focus:ring-1 focus:ring-primary cursor-pointer transition-all">
+                    <SelectValue placeholder="Semua Bukti" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="bg-card border-border text-foreground">
+                    <SelectItem value="all" className="cursor-pointer">Semua Bukti</SelectItem>
+                    <SelectItem value="uploaded" className="cursor-pointer">Sudah Upload Bukti Transfer</SelectItem>
+                    <SelectItem value="not_uploaded" className="cursor-pointer">Belum Upload Bukti Transfer</SelectItem>
+                    <SelectItem value="cash" className="cursor-pointer">Cash (Tunai)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Sort Weight Filter */}
+              {/* Sort Filter */}
               <div className="space-y-1.5">
-                <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Urut Kuantitas / Berat</Label>
-                <select 
-                  className="flex h-10 w-full rounded-xl border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all"
-                  value={weightSort}
-                  onChange={(e) => setWeightSort(e.target.value)}
-                >
-                  <option value="default">Default (Terbaru)</option>
-                  <option value="asc">Kuantitas Terendah → Tertinggi</option>
-                  <option value="desc">Kuantitas Tertinggi → Terendah</option>
-                </select>
+                <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Urutkan Berdasarkan</Label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-full h-10 rounded-xl border border-border bg-background text-xs text-foreground focus:ring-1 focus:ring-primary cursor-pointer transition-all">
+                    <SelectValue placeholder="Default (Terbaru)" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="bg-card border-border text-foreground">
+                    <SelectItem value="default" className="cursor-pointer">Default (Terbaru)</SelectItem>
+                    <SelectItem value="weight_asc" className="cursor-pointer">Berat Terkecil → Terbesar</SelectItem>
+                    <SelectItem value="weight_desc" className="cursor-pointer">Berat Terbesar → Terkecil</SelectItem>
+                    <SelectItem value="price_asc" className="cursor-pointer">Total Harga Terendah → Tertinggi</SelectItem>
+                    <SelectItem value="price_desc" className="cursor-pointer">Total Harga Tertinggi → Terendah</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -417,13 +549,14 @@ export default function Transactions() {
             </div>
 
             {/* Reset Button */}
-            {(statusFilter !== 'all' || proofFilter !== 'all' || weightSort !== 'default') && (
+            {(statusFilter !== 'all' || proofFilter !== 'all' || sortBy !== 'default' || dateFilter !== undefined) && (
               <div className="flex justify-end pt-2">
                 <button
                   onClick={() => {
                     setStatusFilter('all');
                     setProofFilter('all');
-                    setWeightSort('default');
+                    setSortBy('default');
+                    setDateFilter(undefined);
                   }}
                   className="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors flex items-center gap-1 cursor-pointer"
                 >
@@ -435,6 +568,65 @@ export default function Transactions() {
           </div>
         )}
       </div>
+
+      {/* BULK ACTIONS BAR */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-primary/5 border border-primary/20 rounded-2xl p-4 animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-primary font-mono bg-primary/10 px-2.5 py-1 rounded-lg">
+              {selectedIds.length} Data Terpilih
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Ubah Status Terpilih */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5 border-border rounded-xl cursor-pointer">
+                  Ubah Status Terpilih
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card text-foreground border-border">
+                <DropdownMenuItem onClick={() => handleBulkStatusUpdate('antrian')} className="cursor-pointer">
+                  Antrian
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleBulkStatusUpdate('dicuci')} className="cursor-pointer">
+                  Dicuci
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleBulkStatusUpdate('disetrika')} className="cursor-pointer">
+                  Disetrika
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleBulkStatusUpdate('siap diambil')} className="cursor-pointer">
+                  Siap Diambil
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleBulkStatusUpdate('diambil')} className="cursor-pointer">
+                  Diambil
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Hapus Terpilih */}
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={handleBulkDelete}
+              className="h-9 text-xs gap-1.5 rounded-xl cursor-pointer"
+            >
+              <Trash2 size={14} />
+              <span>Hapus Terpilih</span>
+            </Button>
+
+            {/* Deselect All */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedIds([])}
+              className="h-9 text-xs text-muted-foreground hover:text-foreground rounded-xl cursor-pointer"
+            >
+              Batal
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* RENDER LIST (TABLE VS GRID) */}
       {loading ? (
@@ -450,7 +642,7 @@ export default function Transactions() {
             </div>
             <h3 className="text-sm font-semibold text-foreground">Tidak Ada Transaksi</h3>
             <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">
-              {searchQuery || statusFilter !== 'all' || proofFilter !== 'all' || weightSort !== 'default' 
+              {searchQuery || statusFilter !== 'all' || proofFilter !== 'all' || sortBy !== 'default' 
                 ? 'Tidak ada transaksi yang cocok dengan filter pencarian.' 
                 : 'Belum ada transaksi tercatat di sistem laundry.'}
             </p>
@@ -463,7 +655,17 @@ export default function Transactions() {
             <Table>
               <TableHeader className="bg-muted/40 border-b border-border">
                 <TableRow className="border-none hover:bg-transparent">
-                  <TableHead className="w-28 text-muted-foreground font-mono text-xs pl-6">Nota ID</TableHead>
+                  <TableHead className="w-12 pl-6">
+                    <Checkbox 
+                      checked={
+                        currentTransactions.length > 0 && 
+                        currentTransactions.every(t => selectedIds.includes(Number(t.id)))
+                      }
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Pilih semua transaksi"
+                    />
+                  </TableHead>
+                  <TableHead className="w-28 text-muted-foreground font-mono text-xs">Nota ID</TableHead>
                   <TableHead className="w-28 text-muted-foreground font-mono text-xs">Bukti Bayar</TableHead>
                   <TableHead className="text-muted-foreground font-mono text-xs">Pelanggan</TableHead>
                   <TableHead className="text-muted-foreground font-mono text-xs">Kuantitas</TableHead>
@@ -482,7 +684,14 @@ export default function Transactions() {
                       onClick={() => handleViewDetail(trx)}
                       className="border-b border-border/60 cursor-pointer hover:bg-muted/70 dark:hover:bg-neutral-900/50 transition-colors"
                     >
-                      <TableCell className="pl-6 py-4">
+                      <TableCell className="pl-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox 
+                          checked={selectedIds.includes(Number(trx.id))}
+                          onCheckedChange={() => toggleSelect(trx.id)}
+                          aria-label={`Pilih transaksi ${trx.invoice_code}`}
+                        />
+                      </TableCell>
+                      <TableCell>
                         <span className="font-mono font-bold text-primary text-xs tracking-wider">{trx.invoice_code}</span>
                       </TableCell>
                       <TableCell onClick={(e) => { if (trx.clothes_photo) e.stopPropagation(); }}>
@@ -577,18 +786,24 @@ export default function Transactions() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <select 
-                          onClick={(e) => e.stopPropagation()}
-                          className={`h-8 rounded-lg border px-2.5 text-xs font-semibold font-mono bg-background border-border text-foreground hover:bg-muted/80 cursor-pointer focus:outline-none transition-all duration-200 ${getStatusStyles(trx.status)}`} 
+                        <Select 
                           value={trx.status} 
-                          onChange={(e) => handleStatusChange(trx.id, e.target.value)}
+                          onValueChange={(value) => handleStatusChange(trx.id, value)}
                         >
-                          <option value="antrian" className="bg-card text-blue-500">Antrian</option>
-                          <option value="dicuci" className="bg-card text-blue-500">Dicuci</option>
-                          <option value="disetrika" className="bg-card text-blue-500">Disetrika</option>
-                          <option value="siap diambil" className="bg-card text-emerald-500">Siap Diambil</option>
-                          <option value="diambil" className="bg-card text-muted-foreground">Sudah Diambil</option>
-                        </select>
+                          <SelectTrigger 
+                            onClick={(e) => e.stopPropagation()}
+                            className={`h-8 px-2.5 text-xs font-semibold font-mono rounded-lg transition-all duration-200 ${getStatusStyles(trx.status)}`}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="bg-card border-border text-foreground">
+                            <SelectItem value="antrian" className="text-blue-500 cursor-pointer">Antrian</SelectItem>
+                            <SelectItem value="dicuci" className="text-blue-500 cursor-pointer">Dicuci</SelectItem>
+                            <SelectItem value="disetrika" className="text-blue-500 cursor-pointer">Disetrika</SelectItem>
+                            <SelectItem value="siap diambil" className="text-emerald-500 cursor-pointer">Siap Diambil</SelectItem>
+                            <SelectItem value="diambil" className="text-muted-foreground cursor-pointer">Sudah Diambil</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <div className="flex justify-end gap-1.5">
@@ -635,7 +850,21 @@ export default function Transactions() {
                       <span className="text-[10px] font-mono font-bold tracking-wider">PEMBAYARAN TUNAI (CASH)</span>
                     </div>
                   )}
-                  <div className="absolute top-3 left-3 bg-neutral-900/80 dark:bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold tracking-wider">
+                  
+                  {/* Checkbox Overlay */}
+                  <div 
+                    className="absolute top-3 left-3 z-10 bg-black/40 backdrop-blur-sm p-1.5 rounded-lg border border-white/20"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox 
+                      checked={selectedIds.includes(Number(trx.id))}
+                      onCheckedChange={() => toggleSelect(trx.id)}
+                      className="border-white/60 data-[state=checked]:border-primary data-[state=checked]:bg-primary"
+                      aria-label={`Pilih transaksi ${trx.invoice_code}`}
+                    />
+                  </div>
+
+                  <div className="absolute top-3 left-12 bg-neutral-900/80 dark:bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold tracking-wider">
                     {trx.invoice_code}
                   </div>
                   {/* Badge Status Finansial Overlay */}
@@ -675,18 +904,24 @@ export default function Transactions() {
                   <div className="space-y-3 pt-2 border-t border-border/60">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] text-muted-foreground font-mono uppercase font-bold">Status:</span>
-                      <select 
-                        onClick={(e) => e.stopPropagation()}
-                        className={`h-8 rounded-lg border px-2 text-xs font-semibold font-mono bg-background border-border text-foreground hover:bg-muted/80 cursor-pointer focus:outline-none transition-all duration-200 ${getStatusStyles(trx.status)}`} 
+                      <Select 
                         value={trx.status} 
-                        onChange={(e) => handleStatusChange(trx.id, e.target.value)}
+                        onValueChange={(value) => handleStatusChange(trx.id, value)}
                       >
-                        <option value="antrian" className="bg-card text-blue-500">Antrian</option>
-                        <option value="dicuci" className="bg-card text-blue-500">Dicuci</option>
-                        <option value="disetrika" className="bg-card text-blue-500">Disetrika</option>
-                        <option value="siap diambil" className="bg-card text-emerald-500">Siap Diambil</option>
-                        <option value="diambil" className="bg-card text-muted-foreground">Sudah Diambil</option>
-                      </select>
+                        <SelectTrigger 
+                          onClick={(e) => e.stopPropagation()}
+                          className={`h-8 px-2 text-xs font-semibold font-mono rounded-lg transition-all duration-200 ${getStatusStyles(trx.status)}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="bg-card border-border text-foreground">
+                          <SelectItem value="antrian" className="text-blue-500 cursor-pointer">Antrian</SelectItem>
+                          <SelectItem value="dicuci" className="text-blue-500 cursor-pointer">Dicuci</SelectItem>
+                          <SelectItem value="disetrika" className="text-blue-500 cursor-pointer">Disetrika</SelectItem>
+                          <SelectItem value="siap diambil" className="text-emerald-500 cursor-pointer">Siap Diambil</SelectItem>
+                          <SelectItem value="diambil" className="text-muted-foreground cursor-pointer">Sudah Diambil</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="flex items-center justify-between gap-1.5 pt-1">
@@ -748,25 +983,43 @@ export default function Transactions() {
                 {/* Pelanggan */}
                 <div className="space-y-1.5">
                   <Label className="text-muted-foreground text-xs font-semibold">Pelanggan</Label>
-                  <select className="flex h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all" value={formData.customer_id} onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })} required >
-                    <option value="" className="bg-card text-muted-foreground">-- Pilih Pelanggan --</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id} className="bg-card text-foreground">{c.user?.name} ({c.phone})</option>
-                    ))}
-                  </select>
+                  <Select 
+                    value={formData.customer_id} 
+                    onValueChange={(val) => setFormData({ ...formData, customer_id: val })}
+                  >
+                    <SelectTrigger className="w-full h-11 bg-background border-border text-foreground rounded-xl text-sm focus:ring-1 focus:ring-primary">
+                      <SelectValue placeholder="-- Pilih Pelanggan --" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="bg-card border-border text-foreground">
+                      {customers.map((c) => (
+                        <SelectItem key={c.id} value={c.id.toString()} className="cursor-pointer">
+                          {c.user?.name} ({c.phone})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
        
                 {/* Layanan */}
                 <div className="space-y-1.5">
                   <Label className="text-muted-foreground text-xs font-semibold">Layanan</Label>
-                  <select className="flex h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all" value={formData.service_id} onChange={(e) => setFormData({ ...formData, service_id: e.target.value })} required >
-                    <option value="" className="bg-card text-muted-foreground">-- Pilih Layanan --</option>
-                    {services
-                      .filter(service => service.is_active === true || service.is_active === 1 || (editId !== null && service.id.toString() === formData.service_id))
-                      .map((s) => (
-                        <option key={s.id} value={s.id} className="bg-card text-foreground">{s.service_name} ({s.unit})</option>
-                      ))}
-                  </select>
+                  <Select 
+                    value={formData.service_id} 
+                    onValueChange={(val) => setFormData({ ...formData, service_id: val })}
+                  >
+                    <SelectTrigger className="w-full h-11 bg-background border-border text-foreground rounded-xl text-sm focus:ring-1 focus:ring-primary">
+                      <SelectValue placeholder="-- Pilih Layanan --" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="bg-card border-border text-foreground">
+                      {services
+                        .filter(service => service.is_active === true || service.is_active === 1 || (editId !== null && service.id.toString() === formData.service_id))
+                        .map((s) => (
+                          <SelectItem key={s.id} value={s.id.toString()} className="cursor-pointer">
+                            {s.service_name} ({s.unit})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 {/* Kuantitas */}
@@ -783,19 +1036,35 @@ export default function Transactions() {
                 {/* Metode Pembayaran (UKK Mandate) */}
                 <div className="space-y-1.5">
                   <Label className="text-muted-foreground text-xs font-semibold">Metode Pembayaran</Label>
-                  <select className="flex h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all" value={formData.payment_method} onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })} required >
-                    <option value="cash">Cash (Tunai)</option>
-                    <option value="transfer">Transfer Bank</option>
-                  </select>
+                  <Select 
+                    value={formData.payment_method} 
+                    onValueChange={(val) => setFormData({ ...formData, payment_method: val })}
+                  >
+                    <SelectTrigger className="w-full h-11 bg-background border-border text-foreground rounded-xl text-sm focus:ring-1 focus:ring-primary">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="bg-card border-border text-foreground">
+                      <SelectItem value="cash" className="cursor-pointer">Cash (Tunai)</SelectItem>
+                      <SelectItem value="transfer" className="cursor-pointer">Transfer Bank</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Status Pembayaran (UKK Mandate) */}
                 <div className="space-y-1.5">
                   <Label className="text-muted-foreground text-xs font-semibold">Status Pembayaran</Label>
-                  <select className="flex h-11 w-full rounded-xl border border-border bg-background px-3 text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-all" value={formData.payment_status} onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })} required >
-                    <option value="pending">Pending (Belum Bayar)</option>
-                    <option value="paid">Paid (Lunas)</option>
-                  </select>
+                  <Select 
+                    value={formData.payment_status} 
+                    onValueChange={(val) => setFormData({ ...formData, payment_status: val })}
+                  >
+                    <SelectTrigger className="w-full h-11 bg-background border-border text-foreground rounded-xl text-sm focus:ring-1 focus:ring-primary">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="bg-card border-border text-foreground">
+                      <SelectItem value="pending" className="cursor-pointer">Pending (Belum Bayar)</SelectItem>
+                      <SelectItem value="paid" className="cursor-pointer">Paid (Lunas)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Estimasi Harga */}
@@ -850,167 +1119,132 @@ export default function Transactions() {
 
       {/* DETAIL MODAL / NOTA (Operational & Financial Integration) */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto bg-card border-border text-foreground rounded-2xl p-6 no-scrollbar print:max-w-none print:max-h-none print:w-full print:h-full print:bg-white print:text-black print:p-0 print:border-none print:shadow-none print:absolute print:inset-0 print:z-[9999]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-card border-border text-foreground rounded-3xl p-6 no-scrollbar print:max-w-none print:max-h-none print:w-full print:h-full print:bg-white print:text-black print:p-0 print:border-none print:shadow-none print:absolute print:inset-0 print:z-[9999]">
           {selectedTrx && (
-            <div id="print-receipt" className="space-y-6 text-foreground print:text-black print:bg-white print:absolute print:inset-0 print:p-0 print:space-y-4 print:w-[80mm] print:mx-auto print:font-mono print:text-xs">
-              
-              {/* 1. TOP HEADER BANNER */}
-              <div className="bg-primary text-primary-foreground p-6 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 shadow-md print:bg-white print:text-black print:p-0 print:rounded-none print:shadow-none print:border-b print:border-dashed print:border-black print:pb-4">
-                <div className="space-y-1 print:text-center print:w-full">
-                  {/* Identitas Outlet Khusus Cetak Struk */}
-                  <h1 className="hidden print:block print:text-base print:font-black print:uppercase">{localStorage.getItem('shop_name') || 'CDC LAUNDRY'}</h1>
-                  <p className="hidden print:block print:text-[10px] print:text-neutral-500">{localStorage.getItem('shop_address') || 'Jl. Raya Kampus Udayana No. 20, Jimbaran'}</p>
-                  <p className="hidden print:block print:text-[10px] print:text-neutral-500">Telp/WA: {localStorage.getItem('shop_phone') || '081234567890'}</p>
-                  <div className="hidden print:block print:border-t print:border-dashed print:border-black print:my-2" />
-                  
-                  <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 font-mono print:text-neutral-700">Kode Invoice / Nota</span>
-                  <h2 className="text-2xl font-black tracking-tight font-mono print:text-base print:font-bold">{selectedTrx.invoice_code}</h2>
-                  <p className="text-[11px] opacity-75 font-mono print:text-neutral-600">
-                    Masuk: {new Date(selectedTrx.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-                <div className="flex flex-col sm:items-end gap-1.5 print:hidden">
-                  <span className="text-[10px] uppercase font-bold tracking-wider opacity-85 font-mono">Status Cucian & Bayar</span>
-                  <div className="flex gap-1.5 mt-1">
-                    <Badge className="text-xs uppercase font-extrabold tracking-wide px-3 py-1 rounded-full bg-neutral-900/30 text-white border border-white/20">
-                      {selectedTrx.status.toUpperCase()}
-                    </Badge>
-                    <Badge className={`text-xs uppercase font-extrabold tracking-wide px-3 py-1 rounded-full border text-white ${selectedTrx.payment_status === 'paid' ? 'bg-emerald-600' : 'bg-rose-600'}`}>
-                      {selectedTrx.payment_status.toUpperCase()}
-                    </Badge>
+            <div className="space-y-6 print:hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-border/60 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                    <Receipt size={20} />
                   </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-foreground">Detail Transaksi</h3>
+                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{selectedTrx.invoice_code}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full border ${getStatusStyles(selectedTrx.status)}`}>
+                    {selectedTrx.status}
+                  </Badge>
+                  <Badge className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full ${getPaymentStatusStyles(selectedTrx.payment_status)}`}>
+                    {selectedTrx.payment_status.toUpperCase()}
+                  </Badge>
                 </div>
               </div>
 
-              {/* 2. PROGRESS CUCIAN TIMELINE STEPPER */}
-              {(() => {
-                const steps = ['antrian', 'dicuci', 'disetrika', 'siap diambil', 'diambil'];
-                const stepLabels: Record<string, string> = {
-                  'antrian': 'Antrian', 'dicuci': 'Dicuci', 'disetrika': 'Disetrika', 'siap diambil': 'Siap Diambil', 'diambil': 'Selesai'
-                };
-                const currentStepIdx = steps.indexOf(selectedTrx.status.toLowerCase());
-                return (
-                  <div className="bg-muted/45 border border-border/85 p-5 rounded-2xl space-y-4 print:hidden">
-                    <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block font-mono">Progress Cucian</span>
-                    <div className="relative flex items-center justify-between w-full pt-2 pb-1 px-4">
-                      <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-[3px] bg-neutral-200 dark:bg-neutral-800 z-0" />
-                      <div className="absolute left-6 top-1/2 -translate-y-1/2 h-[3px] bg-primary transition-all duration-500 z-0" style={{ width: `${(Math.max(0, currentStepIdx) / (steps.length - 1)) * 100}%` }} />
-                      {steps.map((step, idx) => {
-                        const isActive = idx <= currentStepIdx;
-                        const isCurrent = idx === currentStepIdx;
-                        return (
-                          <div key={step} className="flex flex-col items-center z-10 relative">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all duration-300 ${isCurrent ? 'bg-primary border-primary text-white scale-110 shadow-lg shadow-primary/25' : isActive ? 'bg-neutral-900 border-neutral-900 dark:bg-white dark:border-white text-white dark:text-neutral-950 font-bold' : 'bg-card border-neutral-200 dark:border-neutral-800 text-neutral-400 dark:text-neutral-600'}`}>
-                              <span className="text-[10px] font-bold">{idx + 1}</span>
-                            </div>
-                            <span className={`text-[10px] font-bold mt-2 tracking-tight whitespace-nowrap ${isCurrent ? 'text-primary' : isActive ? 'text-foreground' : 'text-neutral-400 dark:text-neutral-600'}`}>{stepLabels[step]}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+              {/* Grid content */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+                {/* Column 1: Stepper & Package Details (Span 7) */}
+                <div className="md:col-span-7 space-y-6 flex flex-col justify-between">
+                  {/* Progress Timeline */}
+                  <div className="bg-muted/30 border border-border/80 p-5 rounded-2xl">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono mb-4">Progress Cucian</span>
+                    {(() => {
+                      const steps = ['antrian', 'dicuci', 'disetrika', 'siap diambil', 'diambil'];
+                      const stepLabels: Record<string, string> = {
+                        'antrian': 'Antrian', 'dicuci': 'Dicuci', 'disetrika': 'Setrika', 'siap diambil': 'Siap', 'diambil': 'Selesai'
+                      };
+                      const currentStepIdx = steps.indexOf(selectedTrx.status.toLowerCase());
+                      return (
+                        <div className="relative flex items-center justify-between w-full pt-1">
+                          <div className="absolute left-6 right-6 top-4 h-[2px] bg-neutral-200 dark:bg-neutral-800 z-0" />
+                          <div className="absolute left-6 top-4 h-[2px] bg-primary transition-all duration-500 z-0" style={{ width: `${(Math.max(0, currentStepIdx) / (steps.length - 1)) * 100}%` }} />
+                          {steps.map((step, idx) => {
+                            const isActive = idx <= currentStepIdx;
+                            const isCurrent = idx === currentStepIdx;
+                            return (
+                              <div key={step} className="flex flex-col items-center z-10 relative">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all duration-300 ${
+                                  isCurrent ? 'bg-primary border-primary text-white scale-110 shadow-md shadow-primary/20' : 
+                                  isActive ? 'bg-foreground border-foreground text-background font-bold' : 
+                                  'bg-card border-border text-muted-foreground'
+                                }`}>
+                                  <span className="text-[10px] font-bold">{idx + 1}</span>
+                                </div>
+                                <span className={`text-[9px] font-bold mt-2 tracking-tight ${isCurrent ? 'text-primary' : isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                  {stepLabels[step]}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
-                );
-              })()}
 
-              {/* 3. INFORMASI STATUS OPERASIONAL & PEMBAYARAN (READ-ONLY VIEW) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/30 border border-border p-4 rounded-xl print:hidden">
-                <div>
-                  <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block font-mono mb-1">Status Cucian Saat Ini</span>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className={`text-xs uppercase tracking-wider font-extrabold px-3 py-1.5 rounded-full border ${getStatusStyles(selectedTrx.status)}`}>
-                      {selectedTrx.status}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider block font-mono mb-1">Status Pembayaran Saat Ini</span>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className={`text-xs uppercase tracking-wider font-extrabold px-3 py-1.5 rounded-full border ${getPaymentStatusStyles(selectedTrx.payment_status)}`}>
-                      {selectedTrx.payment_status.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-                <div className="sm:col-span-2 flex items-center gap-2 text-[10px] text-muted-foreground bg-card border border-border/80 p-2.5 rounded-lg font-mono">
-                  <AlertCircle size={12} className="text-primary shrink-0" />
-                  <span>Status hanya dapat diubah dengan menekan tombol <strong>"Edit"</strong> di menu utama (Slide-over Form).</span>
-                </div>
-              </div>
-
-              {/* 4. BOTTOM TWO COLUMNS LAYOUT */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-1 print:gap-4">
-                {/* Info Pelanggan */}
-                <div className="space-y-4 border border-border/80 p-5 rounded-2xl bg-card/50 print:border-none print:p-0 print:bg-transparent">
-                  <h4 className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider font-mono border-b border-border/60 pb-2 print:text-black print:border-black print:border-dashed">Info Pelanggan</h4>
-                  <div className="flex items-center gap-3 print:gap-1.5">
-                    <div className="w-11 h-11 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-xs font-mono print:hidden">{getInitials(selectedTrx.customer?.user?.name)}</div>
-                    <div>
-                      <h5 className="font-extrabold text-sm text-foreground leading-tight print:text-xs print:font-bold">{selectedTrx.customer?.user?.name || 'Pelanggan'}</h5>
-                      <p className="text-[10px] text-muted-foreground font-mono mt-0.5 print:text-black">ID: #CST-{selectedTrx.customer?.id}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-3.5 text-xs print:space-y-1.5 print:text-[11px]">
-                    <div>
-                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block font-mono uppercase print:text-black">Email Address</span>
-                      <span className="text-foreground font-semibold mt-0.5 block truncate print:text-black">{selectedTrx.customer?.user?.email || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block font-mono uppercase print:text-black">WhatsApp / HP</span>
-                      <span className="text-foreground font-semibold mt-0.5 block font-mono print:text-black">
-                        {selectedTrx.customer?.phone || '-'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 block font-mono uppercase print:text-black">Alamat Pengiriman</span>
-                      <p className="text-foreground leading-relaxed mt-1 bg-muted/40 p-3 rounded-xl border border-border/60 whitespace-pre-wrap print:bg-transparent print:p-0 print:border-none print:mt-0.5">{selectedTrx.customer?.address || 'Tidak ada info alamat.'}</p>
+                  {/* Package details */}
+                  <div className="bg-card border border-border p-5 rounded-2xl space-y-4 flex-1 mt-4">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono border-b border-border/60 pb-2">Rincian Paket & Cucian</span>
+                    <div className="space-y-3 text-xs">
+                      <div className="flex justify-between items-center py-1">
+                        <span className="text-muted-foreground">Layanan Paket:</span>
+                        <span className="font-bold text-foreground text-sm">{selectedTrx.service?.service_name || '-'}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1 border-t border-border/40">
+                        <span className="text-muted-foreground">Kuantitas / Berat:</span>
+                        <span className="font-semibold text-foreground font-mono">{selectedTrx.weight} {selectedTrx.service?.unit || 'Kg'}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1 border-t border-border/40">
+                        <span className="text-muted-foreground">Tarif Satuan:</span>
+                        <span className="font-medium text-foreground font-mono">Rp {Number(selectedTrx.service?.price || 0).toLocaleString('id-ID')} / {selectedTrx.service?.unit || 'Kg'}</span>
+                      </div>
+                      <div className="bg-primary/5 border border-primary/10 p-3.5 rounded-xl flex justify-between items-center mt-4">
+                        <span className="text-xs font-semibold text-primary uppercase font-mono">Total Tagihan</span>
+                        <span className="text-base font-extrabold text-foreground font-mono">Rp {Number(selectedTrx.total_price || 0).toLocaleString('id-ID')}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Detail Operasional Cucian & Rincian Kasir */}
-                <div className="space-y-4 border border-border/80 p-5 rounded-2xl bg-card/50 print:border-none print:p-0 print:bg-transparent">
-                  <h4 className="text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider font-mono border-b border-border/60 pb-2 print:text-black print:border-black print:border-dashed">Detail Keuangan & Paket</h4>
-                  <div className="space-y-4 print:space-y-2">
-                    <div className="border border-border/60 rounded-xl overflow-hidden text-xs print:border-black print:border-dashed print:rounded-none">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-muted/50 border-b border-border/60 print:bg-transparent print:border-black print:border-dashed">
-                            <th className="p-2.5 font-semibold text-neutral-500 dark:text-neutral-400 font-mono text-[10px] print:text-black print:p-1">LAYANAN / METODE</th>
-                            <th className="p-2.5 text-right font-semibold text-neutral-500 dark:text-neutral-400 font-mono text-[10px] print:text-black print:p-1">TOTAL BIAYA</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/65 print:divide-black print:divide-dashed">
-                          <tr>
-                            <td className="p-2.5 print:p-1">
-                              <span className="font-extrabold text-foreground block print:text-xs print:font-bold">{selectedTrx.service?.service_name || 'Layanan Laundry'}</span>
-                              <span className="text-[10px] text-muted-foreground font-mono block mt-0.5 print:text-black">Kuantitas: {selectedTrx.weight} {selectedTrx.service?.unit || 'Kg'}</span>
-                            </td>
-                            <td className="p-2.5 text-right font-mono font-bold text-foreground print:p-1 print:text-xs print:text-black">
-                              Rp {Number(selectedTrx.total_price || 0).toLocaleString('id-ID')}
-                            </td>
-                          </tr>
-                          <tr className="bg-muted/10 font-medium print:bg-transparent">
-                            <td className="p-2.5 text-neutral-500 dark:text-neutral-400 flex items-center gap-1 print:text-black print:p-1">
-                              Metode ({selectedTrx.payment_method.toUpperCase()})
-                            </td>
-                            <td className="p-2.5 text-right font-bold uppercase tracking-wide font-mono text-[10px] print:text-black print:p-1 print:text-xs">
-                              <span className="print:text-black">
-                                {selectedTrx.payment_status.toUpperCase()}
-                              </span>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                {/* Column 2: Customer info & payment proof (Span 5) */}
+                <div className="md:col-span-5 space-y-6">
+                  {/* Customer Card */}
+                  <div className="bg-card border border-border p-5 rounded-2xl space-y-3">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono border-b border-border/60 pb-2">Pelanggan</span>
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-sm text-foreground">{selectedTrx.customer?.user?.name || 'Pelanggan'}</h4>
+                      <p className="text-[10px] text-muted-foreground font-mono">ID Pelanggan: #CST-{selectedTrx.customer?.id}</p>
                     </div>
+                    <div className="space-y-2 text-xs pt-1">
+                      <div>
+                        <span className="text-[9px] text-muted-foreground block uppercase font-mono">No. WhatsApp</span>
+                        <a href={formatWhatsAppLink(selectedTrx.customer?.phone)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-mono font-semibold block mt-0.5">
+                          {selectedTrx.customer?.phone || '-'} ↗
+                        </a>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-muted-foreground block uppercase font-mono">Alamat</span>
+                        <p className="text-foreground leading-normal mt-0.5 line-clamp-2 text-xs">{selectedTrx.customer?.address || 'Tidak ada alamat'}</p>
+                      </div>
+                    </div>
+                  </div>
 
-                    {/* Foto Bukti Transfer (Hanya Muncul Jika Metode Transfer - Diabaikan Saat Cetak Struk Kertas) */}
+                  {/* Payment Details & Proof */}
+                  <div className="bg-card border border-border p-5 rounded-2xl space-y-3">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono border-b border-border/60 pb-2">Pembayaran</span>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground">Metode:</span>
+                      <Badge variant="outline" className="text-[10px] uppercase font-bold font-mono tracking-wider">{selectedTrx.payment_method}</Badge>
+                    </div>
                     {selectedTrx.payment_method === 'transfer' && (
-                      <div className="print:hidden">
-                        <span className="text-[8px] font-bold text-blue-400 block font-mono uppercase mb-1">Bukti Transfer</span>
-                        <div className="border border-dashed border-blue-500/20 rounded-xl p-1 bg-blue-500/[0.01] overflow-hidden h-24 flex items-center justify-center">
+                      <div className="space-y-1.5 pt-2">
+                        <span className="text-[9px] text-muted-foreground block uppercase font-mono">Bukti Transfer</span>
+                        <div className="border border-dashed border-border rounded-xl p-1 bg-muted/20 overflow-hidden h-28 flex items-center justify-center relative group">
                           {selectedTrx.clothes_photo ? (
                             <img src={`${STORAGE_URL}${selectedTrx.clothes_photo}`} alt="Bukti Transfer" className="h-full object-contain rounded-lg" />
                           ) : (
-                            <span className="text-[9px] text-rose-400 italic font-mono text-center">Belum Upload</span>
+                            <span className="text-[9px] text-rose-500 italic font-mono">Belum Upload</span>
                           )}
                         </div>
                       </div>
@@ -1018,15 +1252,106 @@ export default function Transactions() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Store Footer Print Message */}
-              <div className="text-center space-y-1 pt-4 border-t border-dashed border-border/80 print:border-black print:border-t print:pt-3">
-                <p className="text-xs font-bold text-foreground print:text-[11px] print:font-bold">{localStorage.getItem('receipt_header') || 'Terima Kasih Atas Kepercayaan Anda'}</p>
-                <p className="text-[9px] text-muted-foreground leading-normal max-w-[320px] mx-auto font-mono print:text-[8px] print:text-black">
-                  {localStorage.getItem('receipt_footer') || 'Mohon periksa cucian sebelum meninggalkan outlet. Komplain maksimal 24 jam setelah cucian diambil.'}
-                </p>
+          {selectedTrx && (
+            <div id="print-receipt" className="hidden print:block w-full max-w-[80mm] mx-auto text-black bg-white p-4 font-mono text-[10pt] text-center leading-normal">
+              {/* Style overrides just for printing */}
+              <style>{`
+                @media print {
+                  @page {
+                    margin: 0;
+                    size: 80mm auto;
+                  }
+                  html, body {
+                    background: #fff !important;
+                    color: #000 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    width: 100% !important;
+                  }
+                  #print-receipt {
+                    display: block !important;
+                    width: 100% !important;
+                    max-width: 80mm !important;
+                    margin: 0 auto !important;
+                    padding: 6mm 4mm !important;
+                    font-family: 'Courier New', Courier, monospace !important;
+                    font-size: 10pt !important;
+                    line-height: 1.3 !important;
+                    text-align: center !important;
+                    background: #fff !important;
+                    color: #000 !important;
+                    box-sizing: border-box !important;
+                  }
+                }
+              `}</style>
+              
+              <div className="text-center font-bold uppercase text-sm tracking-wider">
+                {localStorage.getItem('shop_name') || 'CDC LAUNDRY'}
               </div>
-
+              <div className="text-[10px] leading-snug">
+                {localStorage.getItem('shop_address') || 'Jl. Raya Kampus Udayana No. 20, Bali'}
+              </div>
+              <div className="text-[10px] leading-snug">
+                Telp/WA: {localStorage.getItem('shop_phone') || '081234567890'}
+              </div>
+              
+              <div className="my-2 font-mono text-center select-none text-[10px]">--------------------------------</div>
+              
+              <div className="text-left space-y-0.5 text-[11px] font-mono">
+                <div className="flex justify-between">
+                  <span>Invoice:</span>
+                  <span className="font-bold">{selectedTrx.invoice_code}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tanggal:</span>
+                  <span>{new Date(selectedTrx.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pelanggan:</span>
+                  <span>{selectedTrx.customer?.user?.name || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Telepon:</span>
+                  <span>{selectedTrx.customer?.phone || '-'}</span>
+                </div>
+              </div>
+              
+              <div className="my-2 font-mono text-center select-none text-[10px]">--------------------------------</div>
+              
+              <div className="text-left text-[11px] font-mono space-y-1">
+                <div className="font-bold">{selectedTrx.service?.service_name || 'Layanan Laundry'}</div>
+                <div className="flex justify-between pl-2">
+                  <span>{selectedTrx.weight} {selectedTrx.service?.unit || 'Kg'} x Rp {Number(selectedTrx.service?.price || 0).toLocaleString('id-ID')}</span>
+                  <span>Rp {Number(selectedTrx.total_price || 0).toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+              
+              <div className="my-2 font-mono text-center select-none text-[10px]">--------------------------------</div>
+              
+              <div className="text-left space-y-0.5 text-[11px] font-mono">
+                <div className="flex justify-between font-bold text-[12px]">
+                  <span>TOTAL BIAYA:</span>
+                  <span>Rp {Number(selectedTrx.total_price || 0).toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pembayaran:</span>
+                  <span className="uppercase">{selectedTrx.payment_method} ({selectedTrx.payment_status})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Status Cucian:</span>
+                  <span className="uppercase font-bold">{selectedTrx.status}</span>
+                </div>
+              </div>
+              
+              <div className="my-2 font-mono text-center select-none text-[10px]">--------------------------------</div>
+              
+              <div className="text-[10px] leading-relaxed text-center italic font-mono">
+                <p className="font-bold">{localStorage.getItem('receipt_header') || 'Terima Kasih Atas Kepercayaan Anda'}</p>
+                <p className="mt-1 text-[9px]">{localStorage.getItem('receipt_footer') || 'Mohon periksa cucian sebelum meninggalkan outlet. Komplain maksimal 24 jam setelah cucian diambil.'}</p>
+              </div>
             </div>
           )}
 

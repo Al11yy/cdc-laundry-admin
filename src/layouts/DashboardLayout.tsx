@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, Navigate, Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Box, Receipt, LogOut, Settings, Menu, X, 
-  Sun, Moon, Laptop, Bell, Star, Clock, 
+  Sun, Moon, Laptop, Star, 
   Search, BookOpen, Layers, UserCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -45,7 +45,6 @@ export default function DashboardLayout() {
 
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
@@ -90,12 +89,7 @@ export default function DashboardLayout() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const cycleTheme = () => {
-    const currentTheme = theme || 'system';
-    if (currentTheme === 'light') setTheme('dark');
-    else if (currentTheme === 'dark') setTheme('system');
-    else setTheme('light');
-  };
+
 
   const getNotifications = () => {
     const list: any[] = [];
@@ -127,22 +121,6 @@ export default function DashboardLayout() {
         time: 'Konfirmasi'
       });
     });
-
-    // Fallbacks if lists are empty, to ensure we always show realistic notifications
-    if (list.length === 0) {
-      list.push({
-        icon: '⚠️',
-        title: 'Overdue: Nota LND-20260520-1042',
-        desc: 'Cucian Pelanggan Budi tertahan di proses Dicuci selama 32 jam.',
-        time: 'Peringatan'
-      });
-      list.push({
-        icon: '💳',
-        title: 'Transfer Pending: LND-20260523-9921',
-        desc: 'Sophie Laurent membayar via Transfer bank, menunggu verifikasi kasir.',
-        time: 'Konfirmasi'
-      });
-    }
 
     return list;
   };
@@ -570,7 +548,7 @@ export default function DashboardLayout() {
                             : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/[0.02]'
                         }`}
                       >
-                        <span className="flex items-center gap-2">☀️ <span>Light Mode</span></span>
+                        <span>Light</span>
                         {theme === 'light' && <span className="text-[10px] text-emerald-500 font-bold">✓</span>}
                       </button>
                       <button
@@ -584,7 +562,7 @@ export default function DashboardLayout() {
                             : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/[0.02]'
                         }`}
                       >
-                        <span className="flex items-center gap-2">🌙 <span>Dark Mode</span></span>
+                        <span>Dark</span>
                         {theme === 'dark' && <span className="text-[10px] text-emerald-500 font-bold">✓</span>}
                       </button>
                       <button
@@ -598,7 +576,7 @@ export default function DashboardLayout() {
                             : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/[0.02]'
                         }`}
                       >
-                        <span className="flex items-center gap-2">🖥️ <span>System Default</span></span>
+                        <span>System Default</span>
                         {theme === 'system' && <span className="text-[10px] text-emerald-500 font-bold">✓</span>}
                       </button>
                     </div>
@@ -632,18 +610,22 @@ export default function DashboardLayout() {
                 <div className="space-y-4">
                   <span className="text-[10px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider block">Notifications</span>
                   <div className="space-y-3.5">
-                    {getNotifications().map((item, idx) => (
-                      <div key={idx} className="flex gap-3 text-xs leading-normal">
-                        <span className="w-6 h-6 rounded-full bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center text-[10px] shrink-0 border border-neutral-250 dark:border-neutral-800">
-                          {item.icon}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-foreground font-semibold truncate leading-tight">{item.title}</p>
-                          <p className="text-[10px] text-neutral-600 dark:text-neutral-400 leading-normal mt-0.5">{item.desc}</p>
-                          <span className="text-[9px] text-primary font-bold mt-0.5 block">{item.time}</span>
+                    {getNotifications().length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">Tidak ada notifikasi aktif saat ini.</p>
+                    ) : (
+                      getNotifications().map((item, idx) => (
+                        <div key={idx} className="flex gap-3 text-xs leading-normal">
+                          <span className="w-6 h-6 rounded-full bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center text-[10px] shrink-0 border border-neutral-250 dark:border-neutral-800">
+                            {item.icon}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-foreground font-semibold truncate leading-tight">{item.title}</p>
+                            <p className="text-[10px] text-neutral-600 dark:text-neutral-400 leading-normal mt-0.5">{item.desc}</p>
+                            <span className="text-[9px] text-primary font-bold mt-0.5 block">{item.time}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
 

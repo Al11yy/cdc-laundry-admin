@@ -6,9 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, Loader2, Image as ImageIcon, WashingMachine, Search, SlidersHorizontal, CheckSquare, Square, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Image as ImageIcon, WashingMachine, Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSearch } from '@/context/SearchContext';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 
 const STORAGE_URL = 'http://127.0.0.1:8000/storage/';
 
@@ -21,13 +29,14 @@ export default function Services() {
   const { searchQuery, setSearchQuery } = useSearch();
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const [sortBy, setSortBy] = useState('default');
   
   // Selection states for Bulk Actions
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, sortBy]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -131,34 +140,92 @@ export default function Services() {
 
   // Toggle selection for bulk actions
   const toggleSelect = (id: number) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(x => x !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
+    const numId = Number(id);
+    setSelectedIds(prev => 
+      prev.includes(numId) ? prev.filter(item => item !== numId) : [...prev, numId]
+    );
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === filteredServices.length) {
-      setSelectedIds([]);
+    const currentIds = currentServices.map(s => Number(s.id));
+    const allSelected = currentIds.every(id => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds(prev => prev.filter(id => !currentIds.includes(id)));
     } else {
-      setSelectedIds(filteredServices.map(s => s.id));
+      setSelectedIds(prev => {
+        const newSelected = [...prev];
+        currentIds.forEach(id => {
+          if (!newSelected.includes(id)) newSelected.push(id);
+        });
+        return newSelected;
+      });
     }
   };
 
-  // Bulk status update simulation
+  // Bulk status update API call
   const handleBulkStatusChange = async (status: number) => {
-    toast.info(`Memperbarui status ${selectedIds.length} layanan...`);
-    // Optimistic UI update
-    setServices(services.map(s => selectedIds.includes(s.id) ? { ...s, is_active: status } : s));
-    setSelectedIds([]);
-    toast.success('Status layanan terpilih berhasil diperbarui.');
+    if (selectedIds.length === 0) return;
+    setLoading(true);
+    try {
+      await Promise.all(selectedIds.map(async (id) => {
+        const service = services.find(s => s.id === id);
+        if (!service) return;
+        const submitData = new FormData();
+        submitData.append('service_name', service.service_name);
+        submitData.append('description', service.description || '');
+        submitData.append('price', service.price.toString());
+        submitData.append('unit', service.unit);
+        submitData.append('is_active', status.toString());
+        submitData.append('_method', 'PUT');
+        await apiClient.post(`/services/${id}`, submitData);
+      }));
+      toast.success('Status layanan terpilih berhasil diperbarui.');
+      setSelectedIds([]);
+      fetchServices();
+    } catch (error) {
+      toast.error('Gagal memperbarui status beberapa layanan.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filteredServices = services.filter(s => 
-    s.service_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (s.description && s.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Bulk delete API call
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Yakin ingin menghapus ${selectedIds.length} layanan terpilih dari katalog?`)) return;
+    setLoading(true);
+    try {
+      await Promise.all(selectedIds.map(id => apiClient.delete(`/services/${id}`)));
+      toast.success('Layanan terpilih berhasil dihapus.');
+      setSelectedIds([]);
+      fetchServices();
+    } catch (error) {
+      console.error('Error in bulk delete:', error);
+      toast.error('Gagal menghapus beberapa layanan! Mungkin sedang digunakan dalam transaksi.');
+      setSelectedIds([]);
+      fetchServices();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredServices = services
+    .filter(s => 
+      s.service_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.description && s.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+    .sort((a, b) => {
+      if (sortBy === 'date_desc') {
+        return new Date(b.created_at || b.id).getTime() - new Date(a.created_at || a.id).getTime();
+      } else if (sortBy === 'date_asc') {
+        return new Date(a.created_at || a.id).getTime() - new Date(b.created_at || b.id).getTime();
+      } else if (sortBy === 'price_asc') {
+        return Number(a.price) - Number(b.price);
+      } else if (sortBy === 'price_desc') {
+        return Number(b.price) - Number(a.price);
+      }
+      return 0;
+    });
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -193,40 +260,79 @@ export default function Services() {
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          {selectedIds.length > 0 ? (
-            <div className="flex items-center gap-2 bg-muted border border-primary/20 rounded-xl p-1 animate-fade-in">
-              <span className="text-[11px] text-muted-foreground font-mono px-2">
-                {selectedIds.length} Terpilih
-              </span>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => handleBulkStatusChange(1)}
-                className="h-8 border-emerald-500/20 text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs rounded-lg font-medium"
-              >
-                Aktifkan
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => handleBulkStatusChange(0)}
-                className="h-8 border-orange-500/20 text-orange-500 bg-orange-500/10 hover:bg-orange-500/20 text-xs rounded-lg font-medium"
-              >
-                Nonaktifkan
-              </Button>
-            </div>
-          ) : (
-            <Button 
-              variant="outline" 
-              onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
-              className={`border-border rounded-xl gap-2 text-xs transition-colors ${viewMode === 'grid' ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20' : 'text-muted-foreground hover:bg-muted bg-card'}`}
-            >
-              <SlidersHorizontal size={14} /> Tampilan: {viewMode === 'table' ? 'Tabel' : 'Card'}
-            </Button>
-          )}
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+          {/* Sorting Dropdown */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs text-muted-foreground hidden md:inline font-mono">Urutkan:</span>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="h-9 w-[180px] rounded-xl border border-border bg-background text-xs text-foreground focus:ring-1 focus:ring-primary cursor-pointer">
+                <SelectValue placeholder="Default" />
+              </SelectTrigger>
+              <SelectContent position="popper" className="bg-card border-border text-foreground">
+                <SelectItem value="default" className="cursor-pointer">Default</SelectItem>
+                <SelectItem value="date_desc" className="cursor-pointer">Terbaru</SelectItem>
+                <SelectItem value="date_asc" className="cursor-pointer">Terlama</SelectItem>
+                <SelectItem value="price_asc" className="cursor-pointer">Harga Termurah</SelectItem>
+                <SelectItem value="price_desc" className="cursor-pointer">Harga Termahal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button 
+            variant="outline" 
+            onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
+            className={`border-border rounded-xl h-9 gap-2 text-xs transition-colors cursor-pointer ${viewMode === 'grid' ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20' : 'text-muted-foreground hover:bg-muted bg-card'}`}
+          >
+            <SlidersHorizontal size={14} /> {viewMode === 'table' ? 'Grid' : 'Tabel'}
+          </Button>
         </div>
       </div>
+
+      {/* BULK ACTIONS BAR */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-primary/5 border border-primary/20 rounded-2xl p-4 animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-primary font-mono bg-primary/10 px-2.5 py-1 rounded-lg">
+              {selectedIds.length} Layanan Terpilih
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => handleBulkStatusChange(1)}
+              className="h-9 border-emerald-500/20 text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs rounded-xl font-medium cursor-pointer"
+            >
+              Aktifkan Terpilih
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => handleBulkStatusChange(0)}
+              className="h-9 border-orange-500/20 text-orange-500 bg-orange-500/10 hover:bg-orange-500/20 text-xs rounded-xl font-medium cursor-pointer"
+            >
+              Nonaktifkan Terpilih
+            </Button>
+            <Button 
+              size="sm" 
+              variant="destructive" 
+              onClick={handleBulkDelete}
+              className="h-9 text-xs rounded-xl font-medium cursor-pointer gap-1.5"
+            >
+              <Trash2 size={14} />
+              <span>Hapus Terpilih</span>
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedIds([])}
+              className="h-9 text-xs text-muted-foreground hover:text-foreground rounded-xl cursor-pointer"
+            >
+              Batal
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* VIEW CONDITIONAL */}
       {viewMode === 'table' ? (
@@ -235,14 +341,15 @@ export default function Services() {
           <Table>
             <TableHeader className="bg-muted/40 border-b border-border">
               <TableRow className="border-none hover:bg-transparent">
-                <TableHead className="w-12 text-center">
-                  <button onClick={toggleSelectAll} className="text-muted-foreground hover:text-foreground mt-1">
-                    {selectedIds.length === filteredServices.length && filteredServices.length > 0 ? (
-                      <CheckSquare size={16} className="text-primary" />
-                    ) : (
-                      <Square size={16} />
-                    )}
-                  </button>
+                <TableHead className="w-12 pl-6">
+                  <Checkbox 
+                    checked={
+                      currentServices.length > 0 && 
+                      currentServices.every(s => selectedIds.includes(Number(s.id)))
+                    }
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Pilih semua layanan"
+                  />
                 </TableHead>
                 <TableHead className="text-muted-foreground font-mono text-xs">Foto</TableHead>
                 <TableHead className="text-muted-foreground font-mono text-xs">Nama Layanan</TableHead>
@@ -254,14 +361,14 @@ export default function Services() {
             <TableBody>
               {loading ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={5} className="text-center h-32">
+                  <TableCell colSpan={6} className="text-center h-32">
                     <Loader2 className="animate-spin text-primary mx-auto h-8 w-8" />
                     <p className="text-xs text-muted-foreground font-mono mt-2">MENGAMBIL CATALOG...</p>
                   </TableCell>
                 </TableRow>
               ) : filteredServices.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={5} className="py-12">
+                  <TableCell colSpan={6} className="py-12">
                     <div className="flex flex-col items-center justify-center text-center">
                       <div className="w-16 h-16 rounded-2xl bg-muted/65 flex items-center justify-center text-muted-foreground mb-4 border border-border/60 shadow-sm">
                         <WashingMachine className="w-8 h-8 text-muted-foreground" />
@@ -285,14 +392,12 @@ export default function Services() {
                     onClick={() => handleViewDetail(s)}
                     className="border-b border-border/60 cursor-pointer hover:bg-muted/70 dark:hover:bg-neutral-900/50 transition-colors"
                   >
-                    <TableCell className="text-center">
-                      <button onClick={(e) => { e.stopPropagation(); toggleSelect(s.id); }} className="text-muted-foreground hover:text-foreground mt-1">
-                        {selectedIds.includes(s.id) ? (
-                          <CheckSquare size={16} className="text-primary" />
-                        ) : (
-                          <Square size={16} />
-                        )}
-                      </button>
+                    <TableCell className="pl-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox 
+                        checked={selectedIds.includes(Number(s.id))}
+                        onCheckedChange={() => toggleSelect(s.id)}
+                        aria-label={`Pilih layanan ${s.service_name}`}
+                      />
                     </TableCell>
                     <TableCell>
                       {s.service_photo ? (
@@ -391,8 +496,21 @@ export default function Services() {
                     </div>
                   )}
 
+                  {/* Checkbox Overlay */}
+                  <div 
+                    className="absolute top-3 left-3 z-20 bg-black/40 backdrop-blur-sm p-1.5 rounded-lg border border-white/20"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox 
+                      checked={selectedIds.includes(Number(s.id))}
+                      onCheckedChange={() => toggleSelect(s.id)}
+                      className="border-white/60 data-[state=checked]:border-primary data-[state=checked]:bg-primary"
+                      aria-label={`Pilih layanan ${s.service_name}`}
+                    />
+                  </div>
+
                   {/* Floating Status Badge */}
-                  <div className="absolute top-3 left-3 z-10">
+                  <div className="absolute top-3 left-12 z-10">
                     <Badge variant="outline" className={`text-[10px] py-0.5 px-2.5 rounded-full font-bold uppercase tracking-wider border backdrop-blur-md shadow-sm ${
                       s.is_active 
                         ? 'bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border-emerald-500/35' 
@@ -577,28 +695,36 @@ export default function Services() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-muted-foreground text-xs font-semibold">Satuan</Label>
-                    <select 
-                      className="flex h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary" 
+                    <Select 
                       value={formData.unit} 
-                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                      onValueChange={(val) => setFormData({ ...formData, unit: val })}
                     >
-                      <option value="Kg" className="bg-card text-foreground">Per Kg</option>
-                      <option value="Pcs" className="bg-card text-foreground">Per Pcs</option>
-                      <option value="Meter" className="bg-card text-foreground">Per Meter</option>
-                    </select>
+                      <SelectTrigger className="w-full h-10 rounded-xl border border-border bg-background text-sm text-foreground focus:ring-1 focus:ring-primary">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="bg-card border-border text-foreground">
+                        <SelectItem value="Kg" className="cursor-pointer">Per Kg</SelectItem>
+                        <SelectItem value="Pcs" className="cursor-pointer">Per Pcs</SelectItem>
+                        <SelectItem value="Meter" className="cursor-pointer">Per Meter</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 
                 <div className="space-y-1.5">
                   <Label className="text-muted-foreground text-xs font-semibold">Status Katalog</Label>
-                  <select 
-                    className="flex h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary" 
-                    value={formData.is_active} 
-                    onChange={(e) => setFormData({ ...formData, is_active: Number(e.target.value) })}
+                  <Select 
+                    value={formData.is_active.toString()} 
+                    onValueChange={(val) => setFormData({ ...formData, is_active: Number(val) })}
                   >
-                    <option value={1} className="bg-card text-foreground">Katalog Aktif</option>
-                    <option value={0} className="bg-card text-foreground">Nonaktif / Ditangguhkan</option>
-                  </select>
+                    <SelectTrigger className="w-full h-10 rounded-xl border border-border bg-background text-sm text-foreground focus:ring-1 focus:ring-primary">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="bg-card border-border text-foreground">
+                      <SelectItem value="1" className="cursor-pointer">Katalog Aktif</SelectItem>
+                      <SelectItem value="0" className="cursor-pointer">Nonaktif / Ditangguhkan</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-1.5">
@@ -643,12 +769,11 @@ export default function Services() {
 
       {/* DETAIL MODAL (Brosur / Hero Image Layout) */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent showCloseButton={false} className="sm:max-w-[480px] bg-card border-border text-foreground rounded-2xl p-0 overflow-hidden gap-0">
-          
+        <DialogContent showCloseButton={false} className="sm:max-w-[450px] bg-card border border-border text-foreground rounded-3xl p-0 overflow-hidden shadow-2xl gap-0 animate-in zoom-in-95 duration-200">
           {selectedService && (
             <>
-              {/* Hero Image - Bleed to edge */}
-              <div className="w-full h-56 bg-muted overflow-hidden relative">
+              {/* Hero Image */}
+              <div className="w-full h-52 bg-muted overflow-hidden relative border-b border-border/50">
                 {selectedService.service_photo ? (
                   <img 
                     src={`${STORAGE_URL}${selectedService.service_photo}`} 
@@ -656,55 +781,55 @@ export default function Services() {
                     className="w-full h-full object-cover" 
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-muted to-muted/60 text-muted-foreground">
-                    <WashingMachine size={40} strokeWidth={1.5} className="animate-pulse" />
-                    <span className="text-xs font-mono mt-2 opacity-60">Tidak Ada Gambar Brosur</span>
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-neutral-900 to-neutral-950 text-neutral-500">
+                    <WashingMachine size={44} strokeWidth={1.5} className="text-primary/45" />
+                    <span className="text-[10px] font-mono mt-2 uppercase tracking-widest opacity-60">Katalog CDC Laundry</span>
                   </div>
                 )}
 
                 {/* Floating Close Button */}
                 <button 
                   onClick={() => setIsDetailOpen(false)}
-                  className="absolute top-3 right-3 z-20 p-2 rounded-xl bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                  className="absolute top-4 right-4 z-20 p-2 rounded-xl bg-black/45 backdrop-blur-md text-white hover:bg-black/65 transition-colors border border-white/10"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
 
-              {/* Service Info */}
+              {/* Service Info Content */}
               <div className="p-6 space-y-6">
-                <div className="space-y-1.5">
-                  <span className="text-[10px] text-primary font-extrabold font-mono uppercase tracking-widest bg-primary/10 px-2.5 py-1 rounded-lg">
-                    Detail Paket Layanan
+                <div className="space-y-1">
+                  <span className="text-[9px] text-primary font-black font-mono uppercase tracking-widest bg-primary/10 px-2.5 py-1 rounded-lg">
+                    Detail Layanan
                   </span>
-                  <DialogTitle className="text-xl font-black text-foreground tracking-tight pt-1">
+                  <DialogTitle className="text-lg font-black text-foreground tracking-tight pt-2">
                     {selectedService.service_name}
                   </DialogTitle>
                 </div>
                 
                 {selectedService.description && (
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] text-muted-foreground font-extrabold font-mono uppercase tracking-widest">Deskripsi Layanan</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed bg-muted/40 p-4 rounded-2xl border border-border/50">
+                  <div className="space-y-2">
+                    <p className="text-[9px] text-muted-foreground font-bold font-mono uppercase tracking-widest">Deskripsi Layanan</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed bg-muted/30 p-4 rounded-2xl border border-border/60">
                       {selectedService.description}
                     </p>
                   </div>
                 )}
                 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-muted/40 border border-border/60 p-4 rounded-2xl">
+                  <div className="bg-muted/30 border border-border/60 p-4 rounded-2xl">
                     <p className="text-[9px] text-muted-foreground font-bold font-mono uppercase tracking-widest">Tarif Biaya</p>
-                    <p className="font-extrabold text-lg text-primary font-mono mt-1">
+                    <p className="font-extrabold text-base text-foreground font-mono mt-1">
                       Rp {Number(selectedService.price).toLocaleString('id-ID')}
                     </p>
-                    <p className="text-[10px] text-muted-foreground font-mono">per {selectedService.unit}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">per {selectedService.unit}</p>
                   </div>
-                  <div className="bg-muted/40 border border-border/60 p-4 rounded-2xl flex flex-col justify-between">
+                  <div className="bg-muted/30 border border-border/60 p-4 rounded-2xl flex flex-col justify-between">
                     <div>
                       <p className="text-[9px] text-muted-foreground font-bold font-mono uppercase tracking-widest">Status Katalog</p>
-                      <Badge variant="outline" className={`mt-2 text-[10px] uppercase font-extrabold tracking-wider rounded-lg px-2.5 py-0.5 border ${
+                      <Badge variant="outline" className={`mt-2.5 text-[9px] uppercase font-bold tracking-wider rounded-md px-2.5 py-0.5 border ${
                         selectedService.is_active 
-                          ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-400' 
+                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
                           : 'bg-neutral-500/10 text-neutral-500 border-neutral-500/20'
                       }`}>
                         {selectedService.is_active ? 'AKTIF' : 'NONAKTIF'}
@@ -713,12 +838,14 @@ export default function Services() {
                   </div>
                 </div>
 
-                <Button 
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-5 rounded-2xl shadow-lg shadow-primary/10 transition-all active:scale-[0.99]" 
-                  onClick={() => setIsDetailOpen(false)}
-                >
-                  Tutup Brosur Layanan
-                </Button>
+                <div className="pt-2">
+                  <Button 
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-5 rounded-2xl shadow-md transition-all active:scale-[0.99] text-xs" 
+                    onClick={() => setIsDetailOpen(false)}
+                  >
+                    Tutup Detail Layanan
+                  </Button>
+                </div>
               </div>
             </>
           )}
