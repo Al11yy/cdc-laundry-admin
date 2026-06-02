@@ -75,6 +75,171 @@ export default function Transactions() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedTrx, setSelectedTrx] = useState<any>(null);
 
+  const handlePrintReceipt = () => {
+    if (!selectedTrx) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Gagal membuka jendela cetak. Pastikan pop-up blocker Anda dinonaktifkan.');
+      return;
+    }
+    
+    const shopName = localStorage.getItem('shop_name') || 'CDC LAUNDRY';
+    const shopAddress = localStorage.getItem('shop_address') || 'Jl. Raya Kampus Udayana No. 20, Bali';
+    const shopPhone = localStorage.getItem('shop_phone') || '081234567890';
+    const receiptHeader = localStorage.getItem('receipt_header') || 'Terima Kasih Atas Kepercayaan Anda';
+    const receiptFooter = localStorage.getItem('receipt_footer') || 'Mohon periksa cucian sebelum meninggalkan outlet. Komplain maksimal 24 jam setelah cucian diambil.';
+    
+    const invoiceCode = selectedTrx.invoice_code;
+    const formattedDate = new Date(selectedTrx.created_at).toLocaleDateString('id-ID', { 
+      day: 'numeric', 
+      month: 'numeric', 
+      year: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    const customerName = selectedTrx.customer?.user?.name || '-';
+    const customerPhone = selectedTrx.customer?.phone || '-';
+    
+    const serviceName = selectedTrx.service?.service_name || 'Layanan Laundry';
+    const unit = selectedTrx.service?.unit || 'Kg';
+    const priceStr = Number(selectedTrx.service?.price || 0).toLocaleString('id-ID');
+    const weightStr = selectedTrx.weight;
+    const totalPriceStr = Number(selectedTrx.total_price || 0).toLocaleString('id-ID');
+    
+    const paymentMethod = selectedTrx.payment_method.toUpperCase();
+    const paymentStatus = selectedTrx.payment_status.toUpperCase();
+    const status = selectedTrx.status.toUpperCase();
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Cetak Struk - ${invoiceCode}</title>
+          <style>
+            @page {
+              margin: 0;
+              size: 80mm auto;
+            }
+            html, body {
+              background: #fff !important;
+              color: #000 !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 100% !important;
+              box-sizing: border-box;
+            }
+            #receipt-container {
+              width: 100% !important;
+              max-width: 80mm !important;
+              margin: 0 auto !important;
+              padding: 6mm 4mm !important;
+              font-family: 'Courier New', Courier, monospace !important;
+              font-size: 10pt !important;
+              line-height: 1.3 !important;
+              text-align: center !important;
+              box-sizing: border-box !important;
+            }
+            .text-center { text-align: center !important; }
+            .text-left { text-align: left !important; }
+            .text-right { text-align: right !important; }
+            .font-bold { font-weight: bold !important; }
+            .uppercase { text-transform: uppercase !important; }
+            .divider {
+              margin: 6px 0 !important;
+              border-top: 1px dashed #000 !important;
+              height: 0 !important;
+            }
+            .info-table {
+              width: 100% !important;
+              border-collapse: collapse !important;
+              font-size: 10pt !important;
+            }
+            .info-table td {
+              padding: 1px 0 !important;
+            }
+            .flex-justify {
+              display: flex !important;
+              justify-content: space-between !important;
+            }
+            .footer-text {
+              font-size: 8pt !important;
+              margin-top: 8px !important;
+              font-style: italic !important;
+            }
+          </style>
+        </head>
+        <body>
+          <div id="receipt-container">
+            <div class="text-center font-bold" style="font-size: 12pt;">${shopName}</div>
+            <div class="text-center" style="font-size: 9pt;">${shopAddress}</div>
+            <div class="text-center" style="font-size: 9pt;">Telp/WA: ${shopPhone}</div>
+            
+            <div class="divider"></div>
+            
+            <table class="info-table">
+              <tr>
+                <td class="text-left">Invoice:</td>
+                <td class="text-right font-bold">${invoiceCode}</td>
+              </tr>
+              <tr>
+                <td class="text-left">Tanggal:</td>
+                <td class="text-right">${formattedDate}</td>
+              </tr>
+              <tr>
+                <td class="text-left">Pelanggan:</td>
+                <td class="text-right">${customerName}</td>
+              </tr>
+              <tr>
+                <td class="text-left">Telepon:</td>
+                <td class="text-right">${customerPhone}</td>
+              </tr>
+            </table>
+            
+            <div class="divider"></div>
+            
+            <div class="text-left font-bold">${serviceName}</div>
+            <div class="flex-justify" style="padding-left: 8px;">
+              <span>${weightStr} ${unit} x Rp ${priceStr}</span>
+              <span>Rp ${totalPriceStr}</span>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <table class="info-table">
+              <tr class="font-bold">
+                <td class="text-left">TOTAL BIAYA:</td>
+                <td class="text-right">Rp ${totalPriceStr}</td>
+              </tr>
+              <tr>
+                <td class="text-left">Pembayaran:</td>
+                <td class="text-right uppercase">${paymentMethod} (${paymentStatus})</td>
+              </tr>
+              <tr>
+                <td class="text-left">Status Cucian:</td>
+                <td class="text-right font-bold uppercase">${status}</td>
+              </tr>
+            </table>
+            
+            <div class="divider"></div>
+            
+            <div class="footer-text text-center font-bold">${receiptHeader}</div>
+            <div class="footer-text text-center" style="font-size: 8pt; margin-top: 3px;">${receiptFooter}</div>
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() {
+                window.close();
+              }, 100);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -1158,21 +1323,30 @@ export default function Transactions() {
                       const currentStepIdx = steps.indexOf(selectedTrx.status.toLowerCase());
                       return (
                         <div className="relative flex items-center justify-between w-full pt-1">
-                          <div className="absolute left-6 right-6 top-4 h-[2px] bg-neutral-200 dark:bg-neutral-800 z-0" />
-                          <div className="absolute left-6 top-4 h-[2px] bg-primary transition-all duration-500 z-0" style={{ width: `${(Math.max(0, currentStepIdx) / (steps.length - 1)) * 100}%` }} />
+                          {/* Progress Line Wrapper */}
+                          <div className="absolute left-4 right-4 top-5 h-[3px] bg-neutral-150 dark:bg-neutral-900/60 z-0 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary transition-all duration-500 ease-out" 
+                              style={{ width: `${(Math.max(0, currentStepIdx) / (steps.length - 1)) * 100}%` }} 
+                            />
+                          </div>
                           {steps.map((step, idx) => {
-                            const isActive = idx <= currentStepIdx;
+                            const isCompleted = idx < currentStepIdx;
                             const isCurrent = idx === currentStepIdx;
                             return (
                               <div key={step} className="flex flex-col items-center z-10 relative">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all duration-300 ${
-                                  isCurrent ? 'bg-primary border-primary text-white scale-110 shadow-md shadow-primary/20' : 
-                                  isActive ? 'bg-foreground border-foreground text-background font-bold' : 
+                                  isCurrent ? 'bg-primary border-primary text-primary-foreground font-semibold scale-110 shadow-sm shadow-primary/30' : 
+                                  isCompleted ? 'bg-primary/10 border-primary/20 text-primary font-bold' : 
                                   'bg-card border-border text-muted-foreground'
                                 }`}>
-                                  <span className="text-[10px] font-bold">{idx + 1}</span>
+                                  {isCompleted ? (
+                                    <span className="text-[10px]">✓</span>
+                                  ) : (
+                                    <span className="text-[10px] font-mono">{idx + 1}</span>
+                                  )}
                                 </div>
-                                <span className={`text-[9px] font-bold mt-2 tracking-tight ${isCurrent ? 'text-primary' : isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                <span className={`text-[9px] font-bold mt-2 tracking-tight ${isCurrent ? 'text-primary' : isCompleted ? 'text-foreground' : 'text-muted-foreground'}`}>
                                   {stepLabels[step]}
                                 </span>
                               </div>
@@ -1356,7 +1530,7 @@ export default function Transactions() {
           )}
 
           <DialogFooter className="pt-4 flex flex-col sm:flex-row gap-2 print:hidden border-t border-border/60">
-            <Button className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold transition-all" onClick={() => window.print()} >
+            <Button className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold transition-all" onClick={handlePrintReceipt} >
               Cetak Struk (Print)
             </Button>
             <Button variant="outline" className="flex-1 border-border text-foreground hover:bg-muted rounded-xl transition-all" onClick={() => setIsDetailOpen(false)} >

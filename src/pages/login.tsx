@@ -53,21 +53,34 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-background flex flex-col justify-center items-center p-4 font-sans text-foreground">
+    <div className="min-h-screen w-full bg-sidebar flex items-center justify-center p-4 font-sans text-foreground transition-colors duration-300">
       
-      <div className="w-full max-w-[360px] space-y-6">
+      {/* Mock App Window / Login Container */}
+      <div className="w-full max-w-[380px] bg-background border border-border/80 rounded-[28px] overflow-hidden flex flex-col">
         
-        {/* Login Card */}
-        <div className="bg-card border border-border rounded-3xl p-6 md:p-8 shadow-lg space-y-5">
+        {/* Mock Window Header */}
+        <div className="h-11 border-b border-border/60 bg-muted/20 px-5 flex items-center justify-between shrink-0 select-none">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-destructive/30" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/30" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/30" />
+          </div>
+          <span className="text-[9px] font-semibold text-neutral-450 dark:text-neutral-500 font-mono uppercase tracking-wider">
+            cdc-admin-console
+          </span>
+        </div>
+
+        {/* Form Body */}
+        <div className="p-6 sm:p-8 space-y-6">
           
-          {/* Logo and Brand Title */}
-          <div className="flex flex-col items-center space-y-2 text-center pb-2 border-b border-border/60">
-            <div className="w-12 h-12 rounded-2xl overflow-hidden border border-border shadow-sm">
+          {/* Logo and Brand Title (Matches Sidebar Brand) */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl overflow-hidden border border-border shrink-0">
               <img src={logoCdc} alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h1 className="text-base font-extrabold tracking-tight text-foreground font-poppins">CDC Laundry</h1>
-              <p className="text-[9px] text-muted-foreground font-mono uppercase tracking-widest mt-0.5">Admin Access</p>
+              <h2 className="text-sm font-extrabold tracking-tight text-foreground font-poppins">CDC Laundry</h2>
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Sistem Manajemen & Kasir</p>
             </div>
           </div>
 
@@ -124,7 +137,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-10 bg-primary hover:bg-primary/90 disabled:bg-muted text-primary-foreground disabled:text-muted-foreground font-semibold rounded-xl flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] focus:outline-none cursor-pointer text-xs"
+              className="w-full h-10 bg-primary hover:bg-primary/90 disabled:bg-muted text-primary-foreground disabled:text-muted-foreground font-semibold rounded-xl flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] focus:outline-none cursor-pointer text-xs mt-2"
             >
               {loading ? (
                 <>
@@ -139,14 +152,16 @@ export default function Login() {
               )}
             </button>
           </form>
+
+          {/* Footer Inside Container */}
+          <div className="pt-4 border-t border-border/60 text-[9px] text-center text-muted-foreground font-mono">
+            © 2026 CDC Laundry. All Rights Reserved.
+          </div>
+
         </div>
 
-        {/* Footer */}
-        <p className="text-[9px] text-center text-muted-foreground font-mono select-none">
-          ©2026 CDC Laundry. All Rights Reserved.
-        </p>
-
       </div>
+
     </div>
   );
 }

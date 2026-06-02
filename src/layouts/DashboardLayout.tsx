@@ -302,15 +302,15 @@ export default function DashboardLayout() {
                         <Link key={item.path} to={item.path} className="block relative">
                           {/* Active vertical stripe on the very left */}
                           {isActive && !isCollapsed && (
-                            <div className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-md bg-neutral-900 dark:bg-white" />
+                            <div className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-md bg-secondary" />
                           )}
                           <div className={`group flex items-center ${isCollapsed ? 'justify-center py-2.5' : 'justify-between px-3 py-2'} rounded-xl transition-all duration-200 ${
                             isActive 
-                              ? 'bg-neutral-900 text-white font-semibold shadow-sm' 
-                              : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-900 hover:text-white'
+                              ? 'bg-primary text-primary-foreground font-semibold shadow-sm' 
+                              : 'text-neutral-500 dark:text-neutral-400 hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20 dark:hover:text-primary-foreground'
                           }`}>
                             <div className="flex items-center gap-2.5 relative">
-                              <span className={`transition-colors duration-200 ${isActive ? 'text-white' : 'text-neutral-400 dark:text-neutral-500 group-hover:text-white'}`}>
+                              <span className={`transition-colors duration-200 ${isActive ? 'text-primary-foreground' : 'text-neutral-400 dark:text-neutral-500 group-hover:text-primary dark:group-hover:text-primary-foreground'}`}>
                                 {item.icon}
                               </span>
                               {!isCollapsed && <span className="text-xs">{item.name}</span>}
@@ -325,7 +325,7 @@ export default function DashboardLayout() {
                               <Badge variant="outline" className={`h-5 min-w-5 px-1.5 flex items-center justify-center text-[10px] rounded-full font-bold border ${
                                 isActive 
                                   ? 'bg-primary/20 text-primary border-primary/30'
-                                  : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400 border-neutral-300 dark:border-neutral-800'
+                                  : 'bg-neutral-250 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400 border-neutral-300 dark:border-neutral-800'
                               }`}>
                                 {item.badge}
                               </Badge>
@@ -344,8 +344,8 @@ export default function DashboardLayout() {
           <div className="flex flex-col gap-2 mt-auto px-3">
             {/* Menu Settings */}
             <Link to="/dashboard/settings">
-              <div className={`group flex items-center ${isCollapsed ? 'justify-center py-2.5' : 'gap-3 px-3 py-2'} rounded-xl text-neutral-500 dark:text-neutral-400 hover:bg-neutral-900 hover:text-white cursor-pointer transition-all duration-200`}>
-                <Settings size={16} className="text-neutral-400 dark:text-neutral-500 group-hover:text-white" />
+              <div className={`group flex items-center ${isCollapsed ? 'justify-center py-2.5' : 'gap-3 px-3 py-2'} rounded-xl text-neutral-500 dark:text-neutral-400 hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20 dark:hover:text-primary-foreground cursor-pointer transition-all duration-200`}>
+                <Settings size={16} className="text-neutral-400 dark:text-neutral-500 group-hover:text-primary dark:group-hover:text-primary-foreground" />
                 {!isCollapsed && <span className="text-xs">Pengaturan</span>}
               </div>
             </Link>
@@ -353,9 +353,9 @@ export default function DashboardLayout() {
             {/* Logout */}
             <div 
               onClick={handleLogout} 
-              className={`group flex items-center ${isCollapsed ? 'justify-center py-2.5' : 'gap-3 px-3 py-2'} rounded-xl text-neutral-500 dark:text-neutral-400 hover:bg-neutral-900 hover:text-white cursor-pointer transition-all duration-200`}
+              className={`group flex items-center ${isCollapsed ? 'justify-center py-2.5' : 'gap-3 px-3 py-2'} rounded-xl text-neutral-500 dark:text-neutral-400 hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20 dark:hover:text-primary-foreground cursor-pointer transition-all duration-200`}
             >
-              <LogOut size={16} className="text-neutral-400 dark:text-neutral-500 group-hover:text-white" />
+              <LogOut size={16} className="text-neutral-400 dark:text-neutral-500 group-hover:text-primary dark:group-hover:text-primary-foreground" />
               {!isCollapsed && <span className="text-xs">Logout</span>}
             </div>
 
@@ -407,11 +407,11 @@ export default function DashboardLayout() {
                         <Link key={item.path} to={item.path} onClick={() => setIsMobileOpen(false)}>
                           <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border border-transparent transition-all duration-200 ${
                             isActive 
-                              ? 'bg-neutral-900 text-white font-semibold' 
-                              : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-900 hover:text-white'
+                              ? 'bg-primary text-primary-foreground font-semibold shadow-sm' 
+                              : 'text-neutral-500 dark:text-neutral-400 hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20 dark:hover:text-primary-foreground'
                           }`}>
                             <div className="flex items-center gap-3">
-                              <span className={isActive ? 'text-white' : 'text-neutral-400 dark:text-neutral-500'}>
+                              <span className={isActive ? 'text-primary-foreground' : 'text-neutral-400 dark:text-neutral-500 group-hover:text-primary dark:group-hover:text-primary-foreground'}>
                                 {item.icon}
                               </span>
                               <span className="text-sm font-medium">{item.name}</span>
